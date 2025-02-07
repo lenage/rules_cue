@@ -890,7 +890,14 @@ def cue_exported_instance(name, **kwargs):
     )
 
 def cue_test(name, generated_output_file, golden_file = None):
-    """cue_test"""
+    """Creates a test that compares a generated CUE output file against a golden file.
+
+    Args:
+        name: Name of the test target.
+        generated_output_file: The CUE output file to test, typically produced by cue_export or similar.
+        golden_file: Optional. Path to golden/expected output file to compare against. If not provided,
+            will be inferred from generated_output_file by replacing the extension with "golden{extension}".
+    """
     if not golden_file:
         base, extension = paths.split_extension(generated_output_file)
         parts = base.rpartition(":")
