@@ -31,6 +31,9 @@ import (
 // Any non-fatal errors this function encounters should be logged
 // using log.Print.
 func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateResult {
+	// Get the configuration
+	conf := GetConfig(args.Config)
+
 	cueFiles := make(map[string]*ast.File)
 	for _, f := range append(args.RegularFiles, args.GenFiles...) {
 		// Only generate Cue entries for cue files (.cue)
@@ -64,18 +67,22 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		pkg := cueFile.PackageName()
 		if pkg == "" {
 			tgt := exportName(fname)
-			export := &cueExport{
-				Name:    tgt,
-				Src:     fname,
-				Imports: make(map[string]bool),
-			}
-			for _, imprt := range cueFile.Imports {
-				imprt := strings.Trim(imprt.Path.Value, "\"")
-				export.Imports[imprt] = true
-			}
-			exports[tgt] = export
 
-			// Also create a cue_exported_standalone_files rule
+			// Only create tnarg_rules_cue rules if enabled
+			if conf.enableTnargRulesCue {
+				export := &cueExport{
+					Name:    tgt,
+					Src:     fname,
+					Imports: make(map[string]bool),
+				}
+				for _, imprt := range cueFile.Imports {
+					imprt := strings.Trim(imprt.Path.Value, "\"")
+					export.Imports[imprt] = true
+				}
+				exports[tgt] = export
+			}
+
+			// Always create rules_cue rules
 			exportedInstance := &cueExportedInstance{
 				Name:    tgt + "_exported",
 				Src:     fname,
@@ -100,30 +107,32 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 			}
 			exportedFiles[exportedFilesName] = exportedFile
 		} else {
-			// For @com_github_tnarg_rules_cue
-			tgt := fmt.Sprintf("cue_%s_library", pkg)
-			lib, ok := libraries[tgt]
-			if !ok {
-				var importPath string
-				if pkg == implicitPkgName {
-					importPath = baseImportPath
-				} else {
-					importPath = fmt.Sprintf("%s:%s", baseImportPath, pkg)
+			// For @com_github_tnarg_rules_cue - only if enabled
+			if conf.enableTnargRulesCue {
+				tgt := fmt.Sprintf("cue_%s_library", pkg)
+				lib, ok := libraries[tgt]
+				if !ok {
+					var importPath string
+					if pkg == implicitPkgName {
+						importPath = baseImportPath
+					} else {
+						importPath = fmt.Sprintf("%s:%s", baseImportPath, pkg)
+					}
+					lib = &cueLibrary{
+						Name:       tgt,
+						ImportPath: importPath,
+						Imports:    make(map[string]bool),
+					}
+					libraries[tgt] = lib
 				}
-				lib = &cueLibrary{
-					Name:       tgt,
-					ImportPath: importPath,
-					Imports:    make(map[string]bool),
+				lib.Srcs = append(lib.Srcs, fname)
+				for _, imprt := range cueFile.Imports {
+					imprt := strings.Trim(imprt.Path.Value, "\"")
+					lib.Imports[imprt] = true
 				}
-				libraries[tgt] = lib
-			}
-			lib.Srcs = append(lib.Srcs, fname)
-			for _, imprt := range cueFile.Imports {
-				imprt := strings.Trim(imprt.Path.Value, "\"")
-				lib.Imports[imprt] = true
 			}
 
-			// For @rules_cue
+			// For @rules_cue - always generate these
 			instanceTgt := fmt.Sprintf("cue_%s_instance", pkg)
 			instance, ok := instances[instanceTgt]
 			if !ok {
@@ -160,16 +169,18 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	var res language.GenerateResult
 
-	// Generate @com_github_tnarg_rules_cue rules
-	for _, library := range libraries {
-		res.Gen = append(res.Gen, library.ToRule())
+	// Generate @com_github_tnarg_rules_cue rules only if enabled
+	if conf.enableTnargRulesCue {
+		for _, library := range libraries {
+			res.Gen = append(res.Gen, library.ToRule())
+		}
+
+		for _, export := range exports {
+			res.Gen = append(res.Gen, export.ToRule())
+		}
 	}
 
-	for _, export := range exports {
-		res.Gen = append(res.Gen, export.ToRule())
-	}
-
-	// Generate @rules_cue rules
+	// Generate @rules_cue rules - always generate these
 	for _, instance := range instances {
 		res.Gen = append(res.Gen, instance.ToRule())
 
@@ -196,19 +207,13 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		res.Imports[i] = r.PrivateAttr(config.GazelleImportsKey)
 	}
 
-	res.Empty = generateEmpty(args.File, libraries, exports, instances, exportedInstances)
+	res.Empty = generateEmpty(args.File, libraries, exports, instances, exportedInstances, exportedFiles, conf.enableTnargRulesCue)
 
 	return res
 }
 
 func computeImportPath(args language.GenerateArgs) string {
-	c := args.Config
-	var conf *cueConfig
-	if raw, ok := c.Exts[cueName]; ok {
-		conf = raw.(*cueConfig)
-	} else {
-		conf = &cueConfig{}
-	}
+	conf := GetConfig(args.Config)
 
 	suffix, err := filepath.Rel(conf.prefixRel, args.Rel)
 	if err != nil {
@@ -228,35 +233,37 @@ func exportName(basename string) string {
 }
 
 func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[string]*cueExport,
-	instances map[string]*cueInstance, exportedInstances map[string]*cueExportedInstance) []*rule.Rule {
+	instances map[string]*cueInstance, exportedInstances map[string]*cueExportedInstance,
+	exportedFiles map[string]*cueExportedFiles, enableTnargRulesCue bool) []*rule.Rule {
 	if f == nil {
 		return nil
 	}
 	var empty []*rule.Rule
 	for _, r := range f.Rules {
 		switch r.Kind() {
-		case "cue_library":
-			if _, ok := libraries[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule("cue_library", r.Name()))
-			}
-		case "cue_export":
-			if _, ok := exports[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule("cue_export", r.Name()))
+		case "cue_library", "cue_export":
+			// Only check these rules if tnarg_rules_cue is enabled
+			if enableTnargRulesCue {
+				if r.Kind() == "cue_library" {
+					if _, ok := libraries[r.Name()]; !ok {
+						empty = append(empty, rule.NewRule("cue_library", r.Name()))
+					}
+				} else { // cue_export
+					if _, ok := exports[r.Name()]; !ok {
+						empty = append(empty, rule.NewRule("cue_export", r.Name()))
+					}
+				}
 			}
 		case "cue_instance":
 			if _, ok := instances[r.Name()]; !ok {
 				empty = append(empty, rule.NewRule("cue_instance", r.Name()))
 			}
-		case "cue_exported_instance":
+		case "cue_exported_instance", "cue_exported_standalone_files":
 			if _, ok := exportedInstances[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule("cue_exported_instance", r.Name()))
-			}
-		case "cue_exported_standalone_files":
-			if _, ok := exportedInstances[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule("cue_exported_standalone_files", r.Name()))
+				empty = append(empty, rule.NewRule(r.Kind(), r.Name()))
 			}
 		case "cue_exported_files":
-			if _, ok := exportedInstances[r.Name()]; !ok {
+			if _, ok := exportedFiles[r.Name()]; !ok {
 				empty = append(empty, rule.NewRule("cue_exported_files", r.Name()))
 			}
 		}

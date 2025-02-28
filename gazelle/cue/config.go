@@ -17,13 +17,15 @@ type cueConfig struct {
 	// attributes. Set with -go_prefix or # gazelle:prefix.
 	prefix    string
 	prefixRel string
+	// enableTnargRulesCue indicates whether the tnarg_rules_cue should be enabled.
+	enableTnargRulesCue bool
 }
 
 // KnownDirectives returns a list of directive keys that this
 // Configurer can interpret. Gazelle prints errors for directives that
-// are not recoginized by any Configurer.
+// are not recognized by any Configurer.
 func (s *cueLang) KnownDirectives() []string {
-	return []string{"prefix"}
+	return []string{"prefix", "cue_enable_tnarg_rules_cue"}
 }
 
 // RegisterFlags registers command-line flags used by the
@@ -81,7 +83,8 @@ func (s *cueLang) Configure(c *config.Config, rel string, f *rule.File) {
 				}
 				conf.prefix = d.Value
 				conf.prefixRel = rel
-				return
+			case "cue_enable_tnarg_rules_cue":
+				conf.enableTnargRulesCue = true
 			}
 		}
 	}
@@ -95,4 +98,12 @@ func checkPrefix(prefix string) error {
 		return fmt.Errorf("invalid prefix: %q", prefix)
 	}
 	return nil
+}
+
+// GetConfig returns the cueConfig from the provided config.Config
+func GetConfig(c *config.Config) *cueConfig {
+	if raw, ok := c.Exts[cueName]; ok {
+		return raw.(*cueConfig)
+	}
+	return &cueConfig{}
 }
