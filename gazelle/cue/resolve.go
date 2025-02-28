@@ -25,10 +25,20 @@ func (cl *cueLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 	switch r.Kind() {
 	case "cue_library":
 		return []resolve.ImportSpec{
-			resolve.ImportSpec{
+			{
 				Lang: cueName,
 				Imp:  r.AttrString("importpath"),
 			},
+		}
+	case "cue_instance":
+		// For cue_instance, we use the package_name attribute as the import path
+		if pkgName := r.AttrString("package_name"); pkgName != "" {
+			return []resolve.ImportSpec{
+				{
+					Lang: cueName,
+					Imp:  pkgName,
+				},
+			}
 		}
 	}
 	return nil
@@ -90,8 +100,18 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 					} else {
 						cuePkg = base
 					}
-					l := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("cue_%s_library", cuePkg))
-					depSet[l.String()] = true
+
+					// Try to find both cue_library and cue_instance rules
+					libraryLabel := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("cue_%s_library", cuePkg))
+					instanceLabel := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("cue_%s_instance", cuePkg))
+
+					// Prefer cue_instance if we're using the new rules
+					if r.Kind() == "cue_instance" || r.Kind() == "cue_exported_instance" ||
+						r.Kind() == "cue_exported_standalone_files" || r.Kind() == "cue_consolidated_instance" {
+						depSet[instanceLabel.String()] = true
+					} else {
+						depSet[libraryLabel.String()] = true
+					}
 				}
 			}
 		}
@@ -135,4 +155,13 @@ var stdlib = map[string]bool{
 	"tool/file":       true,
 	"tool/http":       true,
 	"tool/os":         true,
+	// New in CUE 0.12
+	"crypto/hmac":     true,
+	"encoding/binary": true,
+	"encoding/pem":    true,
+	"io":              true,
+	"math/rand":       true,
+	"net/url":         true,
+	"path/filepath":   true,
+	"uuid":            true,
 }
