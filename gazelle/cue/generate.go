@@ -58,6 +58,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	// For @rules_cue rules
 	instances := make(map[string]*cueInstance)
 	exportedInstances := make(map[string]*cueExportedInstance)
+	exportedFiles := make(map[string]*cueExportedFiles)
 
 	for fname, cueFile := range cueFiles {
 		pkg := cueFile.PackageName()
@@ -85,6 +86,19 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 				exportedInstance.Imports[imprt] = true
 			}
 			exportedInstances[exportedInstance.Name] = exportedInstance
+
+			// Also create a cue_exported_files rule
+			exportedFilesName := tgt + "_exported_files"
+			exportedFile := &cueExportedFiles{
+				Name:    exportedFilesName,
+				Module:  "",
+				Imports: make(map[string]bool),
+			}
+			for _, imprt := range cueFile.Imports {
+				imprt := strings.Trim(imprt.Path.Value, "\"")
+				exportedFile.Imports[imprt] = true
+			}
+			exportedFiles[exportedFilesName] = exportedFile
 		} else {
 			// For @com_github_tnarg_rules_cue
 			tgt := fmt.Sprintf("cue_%s_library", pkg)
@@ -125,6 +139,22 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 				imprt := strings.Trim(imprt.Path.Value, "\"")
 				instance.Imports[imprt] = true
 			}
+
+			// Also create a cue_exported_files rule
+			exportedFilesName := fmt.Sprintf("cue_%s_exported_files", pkg)
+			exportedFile, ok := exportedFiles[exportedFilesName]
+			if !ok {
+				exportedFile = &cueExportedFiles{
+					Name:    exportedFilesName,
+					Module:  pkg,
+					Imports: make(map[string]bool),
+				}
+				exportedFiles[exportedFilesName] = exportedFile
+			}
+			for _, imprt := range cueFile.Imports {
+				imprt := strings.Trim(imprt.Path.Value, "\"")
+				exportedFile.Imports[imprt] = true
+			}
 		}
 	}
 
@@ -155,6 +185,10 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	for _, exportedInstance := range exportedInstances {
 		res.Gen = append(res.Gen, exportedInstance.ToRule())
+	}
+
+	for _, exportedFile := range exportedFiles {
+		res.Gen = append(res.Gen, exportedFile.ToRule())
 	}
 
 	res.Imports = make([]interface{}, len(res.Gen))
@@ -217,9 +251,16 @@ func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[s
 			if _, ok := exportedInstances[r.Name()]; !ok {
 				empty = append(empty, rule.NewRule("cue_exported_instance", r.Name()))
 			}
-		default:
-			// ignore
+		case "cue_exported_standalone_files":
+			if _, ok := exportedInstances[r.Name()]; !ok {
+				empty = append(empty, rule.NewRule("cue_exported_standalone_files", r.Name()))
+			}
+		case "cue_exported_files":
+			if _, ok := exportedInstances[r.Name()]; !ok {
+				empty = append(empty, rule.NewRule("cue_exported_files", r.Name()))
+			}
 		}
+		// Don't mark other rule types as empty
 	}
 	return empty
 }
@@ -238,7 +279,7 @@ func (cl *cueLibrary) ToRule() *rule.Rule {
 	rule.SetAttr("visibility", []string{"//visibility:public"})
 	rule.SetAttr("importpath", cl.ImportPath)
 	var imprts []string
-	for imprt, _ := range cl.Imports {
+	for imprt := range cl.Imports {
 		imprts = append(imprts, imprt)
 	}
 	sort.Strings(imprts)
@@ -278,7 +319,7 @@ func (ci *cueInstance) ToRule() *rule.Rule {
 	sort.Strings(ci.Srcs)
 	rule.SetAttr("srcs", ci.Srcs)
 	rule.SetAttr("package_name", ci.PackageName)
-	rule.SetAttr("visibility", []string{"//visibility:public"})
+	rule.SetAttr("visibility", []string{"//visibility:__subpackages__"})
 	var imprts []string
 	for imprt := range ci.Imports {
 		imprts = append(imprts, imprt)
@@ -304,9 +345,28 @@ func (cei *cueExportedInstance) ToRule() *rule.Rule {
 		r = rule.NewRule("cue_exported_standalone_files", cei.Name)
 		r.SetAttr("srcs", []string{cei.Src})
 	}
-	r.SetAttr("visibility", []string{"//visibility:public"})
+	r.SetAttr("visibility", []string{"//visibility:__subpackages__"})
 	var imprts []string
 	for imprt := range cei.Imports {
+		imprts = append(imprts, imprt)
+	}
+	sort.Strings(imprts)
+	r.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	return r
+}
+
+type cueExportedFiles struct {
+	Name    string
+	Module  string
+	Imports map[string]bool
+}
+
+func (cef *cueExportedFiles) ToRule() *rule.Rule {
+	r := rule.NewRule("cue_exported_files", cef.Name)
+	r.SetAttr("module", cef.Module)
+	r.SetAttr("visibility", []string{"//visibility:__subpackages__"})
+	var imprts []string
+	for imprt := range cef.Imports {
 		imprts = append(imprts, imprt)
 	}
 	sort.Strings(imprts)
