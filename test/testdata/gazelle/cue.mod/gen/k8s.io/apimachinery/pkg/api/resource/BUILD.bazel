@@ -1,17 +1,4 @@
-load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
 load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
-
-cue_library(
-    name = "cue_resource_library",
-    srcs = [
-        "amount_go_gen.cue",
-        "math_go_gen.cue",
-        "quantity_go_gen.cue",
-        "suffix_go_gen.cue",
-    ],
-    importpath = "example.com/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/api/resource",
-    visibility = ["//visibility:public"],
-)
 
 cue_instance(
     name = "cue_resource_instance",
