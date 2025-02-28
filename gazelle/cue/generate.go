@@ -55,6 +55,10 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	libraries := make(map[string]*cueLibrary)
 	exports := make(map[string]*cueExport)
 
+	// For @rules_cue rules
+	instances := make(map[string]*cueInstance)
+	exportedInstances := make(map[string]*cueExportedInstance)
+
 	for fname, cueFile := range cueFiles {
 		pkg := cueFile.PackageName()
 		if pkg == "" {
@@ -69,7 +73,20 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 				export.Imports[imprt] = true
 			}
 			exports[tgt] = export
+
+			// Also create a cue_exported_standalone_files rule
+			exportedInstance := &cueExportedInstance{
+				Name:    tgt + "_exported",
+				Src:     fname,
+				Imports: make(map[string]bool),
+			}
+			for _, imprt := range cueFile.Imports {
+				imprt := strings.Trim(imprt.Path.Value, "\"")
+				exportedInstance.Imports[imprt] = true
+			}
+			exportedInstances[exportedInstance.Name] = exportedInstance
 		} else {
+			// For @com_github_tnarg_rules_cue
 			tgt := fmt.Sprintf("cue_%s_library", pkg)
 			lib, ok := libraries[tgt]
 			if !ok {
@@ -91,10 +108,29 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 				imprt := strings.Trim(imprt.Path.Value, "\"")
 				lib.Imports[imprt] = true
 			}
+
+			// For @rules_cue
+			instanceTgt := fmt.Sprintf("cue_%s_instance", pkg)
+			instance, ok := instances[instanceTgt]
+			if !ok {
+				instance = &cueInstance{
+					Name:        instanceTgt,
+					PackageName: pkg,
+					Imports:     make(map[string]bool),
+				}
+				instances[instanceTgt] = instance
+			}
+			instance.Srcs = append(instance.Srcs, fname)
+			for _, imprt := range cueFile.Imports {
+				imprt := strings.Trim(imprt.Path.Value, "\"")
+				instance.Imports[imprt] = true
+			}
 		}
 	}
 
 	var res language.GenerateResult
+
+	// Generate @com_github_tnarg_rules_cue rules
 	for _, library := range libraries {
 		res.Gen = append(res.Gen, library.ToRule())
 	}
@@ -103,12 +139,30 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		res.Gen = append(res.Gen, export.ToRule())
 	}
 
+	// Generate @rules_cue rules
+	for _, instance := range instances {
+		res.Gen = append(res.Gen, instance.ToRule())
+
+		// Also create a cue_exported_instance rule for each instance
+		exportedInstanceName := instance.Name + "_exported"
+		exportedInstance := &cueExportedInstance{
+			Name:     exportedInstanceName,
+			Instance: instance.Name,
+			Imports:  instance.Imports,
+		}
+		res.Gen = append(res.Gen, exportedInstance.ToRule())
+	}
+
+	for _, exportedInstance := range exportedInstances {
+		res.Gen = append(res.Gen, exportedInstance.ToRule())
+	}
+
 	res.Imports = make([]interface{}, len(res.Gen))
 	for i, r := range res.Gen {
 		res.Imports[i] = r.PrivateAttr(config.GazelleImportsKey)
 	}
 
-	res.Empty = generateEmpty(args.File, libraries, exports)
+	res.Empty = generateEmpty(args.File, libraries, exports, instances, exportedInstances)
 
 	return res
 }
@@ -139,7 +193,8 @@ func exportName(basename string) string {
 	return strcase.ToSnake(strings.Join(parts[:len(parts)-1], "_"))
 }
 
-func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[string]*cueExport) []*rule.Rule {
+func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[string]*cueExport,
+	instances map[string]*cueInstance, exportedInstances map[string]*cueExportedInstance) []*rule.Rule {
 	if f == nil {
 		return nil
 	}
@@ -153,6 +208,14 @@ func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[s
 		case "cue_export":
 			if _, ok := exports[r.Name()]; !ok {
 				empty = append(empty, rule.NewRule("cue_export", r.Name()))
+			}
+		case "cue_instance":
+			if _, ok := instances[r.Name()]; !ok {
+				empty = append(empty, rule.NewRule("cue_instance", r.Name()))
+			}
+		case "cue_exported_instance":
+			if _, ok := exportedInstances[r.Name()]; !ok {
+				empty = append(empty, rule.NewRule("cue_exported_instance", r.Name()))
 			}
 		default:
 			// ignore
@@ -194,10 +257,59 @@ func (ce *cueExport) ToRule() *rule.Rule {
 	rule.SetAttr("src", ce.Src)
 	rule.SetAttr("visibility", []string{"//visibility:public"})
 	var imprts []string
-	for imprt, _ := range ce.Imports {
+	for imprt := range ce.Imports {
 		imprts = append(imprts, imprt)
 	}
 	sort.Strings(imprts)
 	rule.SetPrivateAttr(config.GazelleImportsKey, imprts)
 	return rule
+}
+
+// New types for @rules_cue rules
+type cueInstance struct {
+	Name        string
+	PackageName string
+	Srcs        []string
+	Imports     map[string]bool
+}
+
+func (ci *cueInstance) ToRule() *rule.Rule {
+	rule := rule.NewRule("cue_instance", ci.Name)
+	sort.Strings(ci.Srcs)
+	rule.SetAttr("srcs", ci.Srcs)
+	rule.SetAttr("package_name", ci.PackageName)
+	rule.SetAttr("visibility", []string{"//visibility:public"})
+	var imprts []string
+	for imprt := range ci.Imports {
+		imprts = append(imprts, imprt)
+	}
+	sort.Strings(imprts)
+	rule.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	return rule
+}
+
+type cueExportedInstance struct {
+	Name     string
+	Instance string
+	Src      string // Used for standalone files
+	Imports  map[string]bool
+}
+
+func (cei *cueExportedInstance) ToRule() *rule.Rule {
+	var r *rule.Rule
+	if cei.Instance != "" {
+		r = rule.NewRule("cue_exported_instance", cei.Name)
+		r.SetAttr("instance", cei.Instance)
+	} else {
+		r = rule.NewRule("cue_exported_standalone_files", cei.Name)
+		r.SetAttr("srcs", []string{cei.Src})
+	}
+	r.SetAttr("visibility", []string{"//visibility:public"})
+	var imprts []string
+	for imprt := range cei.Imports {
+		imprts = append(imprts, imprt)
+	}
+	sort.Strings(imprts)
+	r.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	return r
 }
