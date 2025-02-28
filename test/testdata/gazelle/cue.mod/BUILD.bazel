@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_standalone_files")
+load("@rules_cue//cue:cue.bzl", "cue_exported_standalone_files", "cue_module")
 
 cue_exported_standalone_files(
     name = "module_exported",
@@ -6,8 +6,7 @@ cue_exported_standalone_files(
     visibility = ["//visibility:__subpackages__"],
 )
 
-cue_exported_files(
-    name = "module_exported_files",
-    module = "",
-    visibility = ["//visibility:__subpackages__"],
+cue_module(
+    name = "cue.mod",
+    visibility = ["//visibility:public"],
 )
