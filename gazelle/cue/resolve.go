@@ -60,14 +60,22 @@ func (cl *cueLang) Embeds(r *rule.Rule, from label.Label) []label.Label {
 // generates a "deps" attribute (or the appropriate language-specific
 // equivalent) for each import according to language-specific rules
 // and heuristics.
-func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.RemoteCache, r *rule.Rule, importsRaw interface{}, from label.Label) {
-	if importsRaw == nil {
+func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.RemoteCache, r *rule.Rule, imports interface{}, from label.Label) {
+	// Get the configuration
+	conf := GetConfig(c)
+
+	// Skip resolving imports for tnarg_rules_cue rules if not enabled
+	if !conf.enableTnargRulesCue && (r.Kind() == "cue_library" || r.Kind() == "cue_export") {
 		return
 	}
-	imports := importsRaw.([]string)
+
+	if imports == nil {
+		return
+	}
+	imps := imports.([]string)
 	r.DelAttr("deps")
 	depSet := make(map[string]bool)
-	for _, imp := range imports {
+	for _, imp := range imps {
 		if _, ok := stdlib[imp]; ok {
 			continue
 		}
