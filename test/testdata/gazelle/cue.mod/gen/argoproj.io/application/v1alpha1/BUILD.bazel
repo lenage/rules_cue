@@ -1,0 +1,28 @@
+load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+
+cue_library(
+    name = "cue_v1alpha1_library",
+    srcs = ["types_gen.cue"],
+    importpath = "example.com/gazelle/cue.mod/gen/argoproj.io/application/v1alpha1",
+    visibility = ["//visibility:public"],
+)
+
+cue_instance(
+    name = "cue_v1alpha1_instance",
+    package_name = "v1alpha1",
+    srcs = ["types_gen.cue"],
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_instance(
+    name = "cue_v1alpha1_instance_exported",
+    instance = "cue_v1alpha1_instance",
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_files(
+    name = "cue_v1alpha1_exported_files",
+    module = "v1alpha1",
+    visibility = ["//visibility:__subpackages__"],
+)

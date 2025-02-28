@@ -1,0 +1,28 @@
+load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+
+cue_library(
+    name = "cue_intstr_library",
+    srcs = ["intstr_go_gen.cue"],
+    importpath = "example.com/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/util/intstr",
+    visibility = ["//visibility:public"],
+)
+
+cue_instance(
+    name = "cue_intstr_instance",
+    package_name = "intstr",
+    srcs = ["intstr_go_gen.cue"],
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_instance(
+    name = "cue_intstr_instance_exported",
+    instance = "cue_intstr_instance",
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_files(
+    name = "cue_intstr_exported_files",
+    module = "intstr",
+    visibility = ["//visibility:__subpackages__"],
+)
