@@ -1,0 +1,56 @@
+load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+
+cue_library(
+    name = "cue_runtime_library",
+    srcs = [
+        "allocator_go_gen.cue",
+        "codec_go_gen.cue",
+        "conversion_go_gen.cue",
+        "converter_go_gen.cue",
+        "doc_go_gen.cue",
+        "embedded_go_gen.cue",
+        "helper_go_gen.cue",
+        "interfaces_go_gen.cue",
+        "negotiate_go_gen.cue",
+        "splice_go_gen.cue",
+        "swagger_doc_generator_go_gen.cue",
+        "types_go_gen.cue",
+        "types_proto_go_gen.cue",
+    ],
+    importpath = "example.com/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/runtime",
+    visibility = ["//visibility:public"],
+)
+
+cue_instance(
+    name = "cue_runtime_instance",
+    package_name = "runtime",
+    srcs = [
+        "allocator_go_gen.cue",
+        "codec_go_gen.cue",
+        "conversion_go_gen.cue",
+        "converter_go_gen.cue",
+        "doc_go_gen.cue",
+        "embedded_go_gen.cue",
+        "helper_go_gen.cue",
+        "interfaces_go_gen.cue",
+        "negotiate_go_gen.cue",
+        "splice_go_gen.cue",
+        "swagger_doc_generator_go_gen.cue",
+        "types_go_gen.cue",
+        "types_proto_go_gen.cue",
+    ],
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_instance(
+    name = "cue_runtime_instance_exported",
+    instance = "cue_runtime_instance",
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_files(
+    name = "cue_runtime_exported_files",
+    module = "runtime",
+    visibility = ["//visibility:__subpackages__"],
+)

@@ -1,0 +1,28 @@
+load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+
+cue_library(
+    name = "cue_tool_library",
+    srcs = ["tool.cue"],
+    importpath = "example.com/gazelle/cue.mod/pkg/github.com/abcue/tool",
+    visibility = ["//visibility:public"],
+)
+
+cue_instance(
+    name = "cue_tool_instance",
+    package_name = "tool",
+    srcs = ["tool.cue"],
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_instance(
+    name = "cue_tool_instance_exported",
+    instance = "cue_tool_instance",
+    visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_files(
+    name = "cue_tool_exported_files",
+    module = "tool",
+    visibility = ["//visibility:__subpackages__"],
+)

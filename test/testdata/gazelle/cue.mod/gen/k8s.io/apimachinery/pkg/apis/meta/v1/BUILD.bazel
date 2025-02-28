@@ -1,0 +1,70 @@
+load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+
+cue_library(
+    name = "cue_v1_library",
+    srcs = [
+        "duration_go_gen.cue",
+        "group_version_go_gen.cue",
+        "helpers_go_gen.cue",
+        "meta_go_gen.cue",
+        "micro_time_go_gen.cue",
+        "register_go_gen.cue",
+        "time_go_gen.cue",
+        "time_proto_go_gen.cue",
+        "types_go_gen.cue",
+        "watch_go_gen.cue",
+    ],
+    importpath = "example.com/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/apis/meta/v1",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/runtime:cue_runtime_library",
+        "@io_k8s_apimachinery//pkg/types:cue_types_library",
+        "@io_k8s_apimachinery//pkg/watch:cue_watch_library",
+    ],
+)
+
+cue_instance(
+    name = "cue_v1_instance",
+    package_name = "v1",
+    srcs = [
+        "duration_go_gen.cue",
+        "group_version_go_gen.cue",
+        "helpers_go_gen.cue",
+        "meta_go_gen.cue",
+        "micro_time_go_gen.cue",
+        "register_go_gen.cue",
+        "time_go_gen.cue",
+        "time_proto_go_gen.cue",
+        "types_go_gen.cue",
+        "watch_go_gen.cue",
+    ],
+    visibility = ["//visibility:__subpackages__"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/runtime:cue_runtime_instance",
+        "@io_k8s_apimachinery//pkg/types:cue_types_instance",
+        "@io_k8s_apimachinery//pkg/watch:cue_watch_instance",
+    ],
+)
+
+cue_exported_instance(
+    name = "cue_v1_instance_exported",
+    instance = "cue_v1_instance",
+    visibility = ["//visibility:__subpackages__"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/runtime:cue_runtime_instance",
+        "@io_k8s_apimachinery//pkg/types:cue_types_instance",
+        "@io_k8s_apimachinery//pkg/watch:cue_watch_instance",
+    ],
+)
+
+cue_exported_files(
+    name = "cue_v1_exported_files",
+    module = "v1",
+    visibility = ["//visibility:__subpackages__"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/runtime:cue_runtime_library",
+        "@io_k8s_apimachinery//pkg/types:cue_types_library",
+        "@io_k8s_apimachinery//pkg/watch:cue_watch_library",
+    ],
+)
