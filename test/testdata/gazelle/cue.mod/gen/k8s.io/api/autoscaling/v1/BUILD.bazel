@@ -1,20 +1,4 @@
-load("@com_github_tnarg_rules_cue//cue:cue.bzl", "cue_library")
 load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
-
-cue_library(
-    name = "cue_v1_library",
-    srcs = [
-        "register_go_gen.cue",
-        "types_go_gen.cue",
-    ],
-    importpath = "example.com/gazelle/cue.mod/gen/k8s.io/api/autoscaling/v1",
-    visibility = ["//visibility:public"],
-    deps = [
-        "@io_k8s_api//core/v1:cue_v1_library",
-        "@io_k8s_apimachinery//pkg/api/resource:cue_resource_library",
-        "@io_k8s_apimachinery//pkg/apis/meta/v1:cue_v1_library",
-    ],
-)
 
 cue_instance(
     name = "cue_v1_instance",
