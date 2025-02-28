@@ -77,12 +77,15 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 		"cue_instance": {
 			MatchAttrs: []string{"package_name"},
 			NonEmptyAttrs: map[string]bool{
-				"srcs": true,
-				"deps": true,
+				"srcs":     true,
+				"deps":     true,
+				"ancestor": true,
 			},
 			MergeableAttrs: map[string]bool{
 				"deps":         true,
 				"package_name": true,
+				"ancestor":     true,
+				"srcs":         true,
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},

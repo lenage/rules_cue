@@ -3,6 +3,7 @@ package cuelang
 import (
 	"fmt"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -62,6 +63,12 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	instances := make(map[string]*cueInstance)
 	exportedInstances := make(map[string]*cueExportedInstance)
 	exportedFiles := make(map[string]*cueExportedFiles)
+
+	// Check if current directory is cue.mod
+	isCueModDir := path.Base(args.Dir) == "cue.mod"
+
+	// Find the nearest cue_module by looking up the directory tree
+	moduleLabel := findNearestCueModule(args.Dir, args.Rel)
 
 	for fname, cueFile := range cueFiles {
 		pkg := cueFile.PackageName()
@@ -140,6 +147,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 					Name:        instanceTgt,
 					PackageName: pkg,
 					Imports:     make(map[string]bool),
+					Module:      moduleLabel,
 				}
 				instances[instanceTgt] = instance
 			}
@@ -168,6 +176,14 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	}
 
 	var res language.GenerateResult
+
+	// Generate cue_module rule if current directory is cue.mod
+	if isCueModDir {
+		cueModule := &cueModule{
+			Name: "cue.mod",
+		}
+		res.Gen = append(res.Gen, cueModule.ToRule())
+	}
 
 	// Generate @com_github_tnarg_rules_cue rules only if enabled
 	if conf.enableTnargRulesCue {
@@ -207,9 +223,36 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		res.Imports[i] = r.PrivateAttr(config.GazelleImportsKey)
 	}
 
-	res.Empty = generateEmpty(args.File, libraries, exports, instances, exportedInstances, exportedFiles, conf.enableTnargRulesCue)
+	res.Empty = generateEmpty(args.File, libraries, exports, instances, exportedInstances, exportedFiles, conf.enableTnargRulesCue, isCueModDir)
 
 	return res
+}
+
+// findNearestCueModule looks for a cue.mod directory up the directory tree
+// and returns the label to the cue_module rule
+func findNearestCueModule(dir, rel string) string {
+	// Start from the current directory and go up
+	currentRel := rel
+	for currentRel != "" {
+		// Check if there's a cue.mod directory at this level
+		cueModPath := filepath.Join(filepath.Dir(dir), filepath.Join(filepath.Dir(currentRel), "cue.mod"))
+		if info, err := os.Stat(cueModPath); err == nil && info.IsDir() {
+			// Found a cue.mod directory, return the label
+			if currentRel == "." {
+				return "//:cue.mod"
+			}
+			return fmt.Sprintf("//%s:cue.mod", filepath.Dir(currentRel))
+		}
+
+		// Move up one directory
+		currentRel = filepath.Dir(currentRel)
+		if currentRel == "." {
+			currentRel = ""
+		}
+	}
+
+	// If we reach the root without finding a cue.mod, return empty
+	return ""
 }
 
 func computeImportPath(args language.GenerateArgs) string {
@@ -234,7 +277,7 @@ func exportName(basename string) string {
 
 func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[string]*cueExport,
 	instances map[string]*cueInstance, exportedInstances map[string]*cueExportedInstance,
-	exportedFiles map[string]*cueExportedFiles, enableTnargRulesCue bool) []*rule.Rule {
+	exportedFiles map[string]*cueExportedFiles, enableTnargRulesCue bool, isCueModDir bool) []*rule.Rule {
 	if f == nil {
 		return nil
 	}
@@ -265,6 +308,10 @@ func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[s
 		case "cue_exported_files":
 			if _, ok := exportedFiles[r.Name()]; !ok {
 				empty = append(empty, rule.NewRule("cue_exported_files", r.Name()))
+			}
+		case "cue_module":
+			if !isCueModDir {
+				empty = append(empty, rule.NewRule("cue_module", r.Name()))
 			}
 		}
 		// Don't mark other rule types as empty
@@ -319,6 +366,7 @@ type cueInstance struct {
 	PackageName string
 	Srcs        []string
 	Imports     map[string]bool
+	Module      string // Reference to the nearest cue_module
 }
 
 func (ci *cueInstance) ToRule() *rule.Rule {
@@ -327,6 +375,12 @@ func (ci *cueInstance) ToRule() *rule.Rule {
 	rule.SetAttr("srcs", ci.Srcs)
 	rule.SetAttr("package_name", ci.PackageName)
 	rule.SetAttr("visibility", []string{"//visibility:__subpackages__"})
+
+	// Set module attribute if a cue_module was found
+	if ci.Module != "" {
+		rule.SetAttr("ancestor", ci.Module)
+	}
+
 	var imprts []string
 	for imprt := range ci.Imports {
 		imprts = append(imprts, imprt)
@@ -378,5 +432,16 @@ func (cef *cueExportedFiles) ToRule() *rule.Rule {
 	}
 	sort.Strings(imprts)
 	r.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	return r
+}
+
+// Add cue_module type
+type cueModule struct {
+	Name string
+}
+
+func (cm *cueModule) ToRule() *rule.Rule {
+	r := rule.NewRule("cue_module", cm.Name)
+	r.SetAttr("visibility", []string{"//visibility:public"})
 	return r
 }

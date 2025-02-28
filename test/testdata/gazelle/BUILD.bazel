@@ -1,7 +1,6 @@
 load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
 
 # gazelle:prefix example.com/gazelle
-
 cue_instance(
     name = "cue_gazelle_instance",
     package_name = "gazelle",
