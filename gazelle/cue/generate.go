@@ -228,30 +228,23 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	return res
 }
 
-// findNearestCueModule looks for a cue.mod directory up the directory tree
-// and returns the label to the cue_module rule
+// findNearestCueModule searches for a cue.mod directory up the directory tree
+// and returns the label to the cue_module rule.
 func findNearestCueModule(dir, rel string) string {
-	// Start from the current directory and go up
-	currentRel := rel
-	for currentRel != "" {
-		// Check if there's a cue.mod directory at this level
-		cueModPath := filepath.Join(filepath.Dir(dir), filepath.Join(filepath.Dir(currentRel), "cue.mod"))
+	for currentDir, currentRel := dir, rel; currentRel != ""; {
+		cueModPath := filepath.Join(currentDir, "cue.mod")
 		if info, err := os.Stat(cueModPath); err == nil && info.IsDir() {
-			// Found a cue.mod directory, return the label
 			if currentRel == "." {
 				return "//:cue.mod"
 			}
-			return fmt.Sprintf("//%s:cue.mod", filepath.Dir(currentRel))
+			return fmt.Sprintf("//%s:cue.mod", currentRel)
 		}
-
-		// Move up one directory
+		currentDir = filepath.Dir(currentDir)
 		currentRel = filepath.Dir(currentRel)
 		if currentRel == "." {
 			currentRel = ""
 		}
 	}
-
-	// If we reach the root without finding a cue.mod, return empty
 	return ""
 }
 
