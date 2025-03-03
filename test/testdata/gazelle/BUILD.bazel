@@ -1,3 +1,5 @@
+#gazelle:prefix example.com
+
 load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
 
 cue_instance(
