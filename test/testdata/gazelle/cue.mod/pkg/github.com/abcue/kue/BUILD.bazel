@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_instance", "cue_instance")
 
 cue_instance(
     name = "cue_kue_instance",
@@ -10,12 +10,6 @@ cue_instance(
 
 cue_exported_instance(
     name = "cue_kue_instance_exported",
-    instance = "cue_kue_instance",
-    visibility = ["//visibility:public"],
-)
-
-cue_exported_files(
-    name = "cue_kue_exported_files",
-    module = "kue",
-    visibility = ["//visibility:public"],
+    instance = ":cue_kue_instance",
+    visibility = ["//visibility:__subpackages__"],
 )

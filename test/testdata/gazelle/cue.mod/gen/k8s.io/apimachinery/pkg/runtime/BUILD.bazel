@@ -24,6 +24,6 @@ cue_instance(
 
 cue_exported_instance(
     name = "cue_runtime_instance_exported",
-    instance = "cue_runtime_instance",
-    visibility = ["//visibility:public"],
+    instance = ":cue_runtime_instance",
+    visibility = ["//visibility:__subpackages__"],
 )
