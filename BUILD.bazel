@@ -6,9 +6,9 @@ gazelle_binary(
     visibility = ["//visibility:public"],
 )
 
-# gazelle:prefix github.com/seh/rules_cue
 gazelle(
     name = "gazelle",
+    command = "fix",
     gazelle = "//:gazelle_binary",
 )
 

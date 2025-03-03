@@ -139,6 +139,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 				"escape":        true,
 				"output_format": false,
 				"result":        true,
+				"srcs":          true,
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
