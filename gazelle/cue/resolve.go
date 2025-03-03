@@ -36,7 +36,7 @@ var (
 func init() {
 	cueModules = make(map[string]*CueModuleInfo)
 	cueModIndex = make(map[string]string)
-	debugModIndex = true
+	debugModIndex = false
 }
 
 // RegisterCueModule registers a cue_module for later use in resolution
@@ -162,10 +162,19 @@ func (cl *cueLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 	case "cue_instance":
 		// For cue_instance, we use the package_name attribute as the import path
 		if pkgName := r.AttrString("package_name"); pkgName != "" {
+			// Get the configuration to access the prefix
+			conf := GetConfig(c)
+			importPath := pkgName
+
+			// If we have a prefix, use it to form a fully qualified import path
+			if conf.prefix != "" && !strings.Contains(pkgName, "/") {
+				importPath = path.Join(conf.prefix, pkgName)
+			}
+
 			return []resolve.ImportSpec{
 				{
 					Lang: cueName,
-					Imp:  pkgName,
+					Imp:  importPath,
 				},
 			}
 		}
