@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_instance")
 
 cue_instance(
     name = "cue_watch_instance",
@@ -15,16 +15,15 @@ cue_instance(
     deps = ["//test/testdata/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/runtime:cue_runtime_instance"],
 )
 
-cue_exported_instance(
-    name = "cue_watch_instance_exported",
-    instance = ":cue_watch_instance",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
 cue_exported_files(
     name = "watch_cue_exported_files",
-    srcs = ["doc_go_gen.cue"],
+    srcs = [
+        "doc_go_gen.cue",
+        "filter_go_gen.cue",
+        "mux_go_gen.cue",
+        "streamwatcher_go_gen.cue",
+        "watch_go_gen.cue",
+    ],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
