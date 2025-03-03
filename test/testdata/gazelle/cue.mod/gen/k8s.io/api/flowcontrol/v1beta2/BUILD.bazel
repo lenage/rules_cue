@@ -20,8 +20,16 @@ cue_exported_instance(
     visibility = ["//visibility:public"],
 )
 
+cue_exported_instance(
+    name = "v1beta2_cue_exported_instance",
+    instance = ":cue_v1beta2_instance",
+    output_format = "json",
+    visibility = ["//visibility:public"],
+)
+
 cue_exported_files(
-    name = "cue_v1beta2_exported_files",
+    name = "v1beta2_cue_exported_files",
+    srcs = ["register_go_gen.cue"],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
