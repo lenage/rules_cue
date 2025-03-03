@@ -198,22 +198,6 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 		instance.Imports[imprt] = true
 	}
 
-	// Process exported instance
-	exportedInstanceName := fmt.Sprintf("%s_cue_exported_instance", pkg)
-	exportedInstance, ok := ctx.exportedInstances[exportedInstanceName]
-	if !ok {
-		exportedInstance = &cueExportedInstance{
-			Name:         exportedInstanceName,
-			Instance:     instanceTgt,
-			Imports:      make(map[string]bool),
-			OutputFormat: ctx.config.cueOutputFormat,
-		}
-		ctx.exportedInstances[exportedInstanceName] = exportedInstance
-	}
-	for _, imprt := range imports {
-		exportedInstance.Imports[imprt] = true
-	}
-
 	// Process exported files
 	exportedFilesName := fmt.Sprintf("%s_cue_exported_files", pkg)
 	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
