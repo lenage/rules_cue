@@ -93,7 +93,7 @@ func (s *cueLang) Configure(c *config.Config, rel string, f *rule.File) {
 				conf.prefix = d.Value
 				conf.prefixRel = rel
 			case "cue_enable_tnarg_rules_cue":
-				conf.enableTnargRulesCue = true
+				conf.enableTnargRulesCue = false
 			case "cue_output_format":
 				conf.cueOutputFormat = d.Value
 			}
