@@ -43,18 +43,21 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	// Setup context for rule generation
 	ctx := &ruleGenerationContext{
-		config:            conf,
-		implicitPkgName:   path.Base(args.Rel),
-		baseImportPath:    computeImportPath(args),
-		isCueModDir:       path.Base(args.Dir) == "cue.mod",
-		moduleLabel:       findNearestCueModule(args.Dir, args.Rel),
-		libraries:         make(map[string]*cueLibrary),
-		exports:           make(map[string]*cueExport),
-		instances:         make(map[string]*cueInstance),
-		exportedInstances: make(map[string]*cueExportedInstance),
-		exportedFiles:     make(map[string]*cueExportedFiles),
-		//consolidatedInstances: make(map[string]*cueConsolidatedInstance),
+		config:              conf,
+		implicitPkgName:     path.Base(args.Rel),
+		baseImportPath:      computeImportPath(args),
+		isCueModDir:         path.Base(args.Dir) == "cue.mod",
+		moduleLabel:         findNearestCueModule(args.Dir, args.Rel),
+		libraries:           make(map[string]*cueLibrary),
+		exports:             make(map[string]*cueExport),
+		instances:           make(map[string]*cueInstance),
+		exportedFiles:       make(map[string]*cueExportedFiles),
 		enableTnargRulesCue: conf.enableTnargRulesCue,
+
+		// NOTE(yuan): do not generate exportedInstance by default
+		// exportedInstances: make(map[string]*cueExportedInstance),
+		// NOTE(yuan): do not generate consolidatedInstances by default
+		//consolidatedInstances: make(map[string]*cueConsolidatedInstance),
 	}
 
 	// Process each CUE file
@@ -73,6 +76,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	var res language.GenerateResult
 
 	// Generate cue_module rule if in cue.mod directory
+	// log.Printf("DEBUG dir: %s, args: %s\n, modelLabel: %s", args.Dir, args.Rel, ctx.moduleLabel)
 	if ctx.isCueModDir {
 		moduleRule := generateCueModuleRule(args.Rel)
 		res.Gen = append(res.Gen, moduleRule)
@@ -82,7 +86,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	res.Gen = append(res.Gen, generateRules(ctx)...)
 
 	// Set imports for dependency resolution
-	res.Imports = make([]interface{}, len(res.Gen))
+	res.Imports = make([]any, len(res.Gen))
 	for i, r := range res.Gen {
 		res.Imports[i] = r.PrivateAttr(config.GazelleImportsKey)
 	}
@@ -209,15 +213,17 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 			OutputFormat: ctx.config.cueOutputFormat,
 		}
 		ctx.exportedFiles[exportedFilesName] = exportedFile
-		if len(instance.Srcs) > 0 {
-			exportedFile.Srcs = instance.Srcs
-		}
 	}
+
 	for _, imprt := range imports {
 		exportedFile.Imports[imprt] = true
 	}
 
-	if len(ctx.consolidatedInstances) > 0 {
+	if len(instance.Srcs) > 0 {
+		exportedFile.Srcs = instance.Srcs
+	}
+
+	if ctx.consolidatedInstances != nil {
 		// Process consolidated instance
 		consolidatedName := fmt.Sprintf("cue_%s_consolidated", pkg)
 		consolidated, ok := ctx.consolidatedInstances[consolidatedName]
@@ -288,19 +294,21 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 		}
 	}
 
-	// Generate @rules_cue rules
+	// Generate @rules_cue instance
 	for _, instance := range ctx.instances {
 		rules = append(rules, instance.ToRule())
 
-		// Create a cue_exported_instance rule for each instance
-		exportedInstanceName := instance.Name + "_exported"
-		exportedInstance := &cueExportedInstance{
-			Name:         exportedInstanceName,
-			Instance:     instance.TargetName(),
-			Imports:      instance.Imports,
-			OutputFormat: ctx.config.cueOutputFormat,
+		if ctx.exportedInstances != nil {
+			// Create a cue_exported_instance rule for each instance
+			exportedInstanceName := instance.Name + "_exported"
+			exportedInstance := &cueExportedInstance{
+				Name:         exportedInstanceName,
+				Instance:     instance.TargetName(),
+				Imports:      instance.Imports,
+				OutputFormat: ctx.config.cueOutputFormat,
+			}
+			rules = append(rules, exportedInstance.ToRule())
 		}
-		rules = append(rules, exportedInstance.ToRule())
 	}
 
 	for _, exportedInstance := range ctx.exportedInstances {

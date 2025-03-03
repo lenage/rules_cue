@@ -19,7 +19,11 @@ type cueConfig struct {
 	prefixRel string
 	// enableTnargRulesCue indicates whether the tnarg_rules_cue should be enabled.
 	enableTnargRulesCue bool
-	cueOutputFormat     string
+
+	// cueOutputFormat specifies the output format for CUE exports.
+	// Valid values are "json", "yaml", and "text".
+	// Default is "json" if not specified.
+	cueOutputFormat string
 }
 
 // KnownDirectives returns a list of directive keys that this
