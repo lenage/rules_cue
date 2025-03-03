@@ -306,16 +306,20 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 						cuePkg = base
 					}
 
-					// Try to find both cue_library and cue_instance rules
-					libraryLabel := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("cue_%s_library", cuePkg))
 					instanceLabel := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("cue_%s_instance", cuePkg))
 
 					// Prefer cue_instance if we're using the new rules
-					if r.Kind() == "cue_instance" || r.Kind() == "cue_exported_instance" ||
-						r.Kind() == "cue_exported_standalone_files" || r.Kind() == "cue_consolidated_instance" {
+					// Check if the rule kind is one that should use instance labels
+					instanceKinds := map[string]bool{
+						"cue_exported_files":            true,
+						"cue_instance":                  true,
+						"cue_exported_instance":         true,
+						"cue_exported_standalone_files": true,
+						"cue_consolidated_instance":     true,
+					}
+
+					if instanceKinds[r.Kind()] {
 						depSet[instanceLabel.String()] = true
-					} else {
-						depSet[libraryLabel.String()] = true
 					}
 				}
 			}
