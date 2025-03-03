@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_standalone_files")
+load("@rules_cue//cue:cue.bzl", "cue_exported_standalone_files")
 
 cue_exported_standalone_files(
     name = "prod_exported",
@@ -9,17 +9,5 @@ cue_exported_standalone_files(
 cue_exported_standalone_files(
     name = "dev_exported",
     srcs = ["dev.cue"],
-    visibility = ["//visibility:__subpackages__"],
-)
-
-cue_exported_files(
-    name = "prod_exported_files",
-    module = "",
-    visibility = ["//visibility:__subpackages__"],
-)
-
-cue_exported_files(
-    name = "dev_exported_files",
-    module = "",
     visibility = ["//visibility:__subpackages__"],
 )

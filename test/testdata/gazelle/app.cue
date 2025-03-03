@@ -1,5 +1,9 @@
 package gazelle
 
+import (
+	appsv1 "k8s.io/api/apps/v1"
+)
+
 #MyDeployment: appsv1.#Deployment & {
 	#Replicas: int
 
