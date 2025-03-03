@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
 
 cue_instance(
     name = "cue_v2beta1_instance",
@@ -15,5 +15,14 @@ cue_instance(
 cue_exported_instance(
     name = "cue_v2beta1_instance_exported",
     instance = ":cue_v2beta1_instance",
-    visibility = ["//visibility:__subpackages__"],
+    output_format = "json",
+    visibility = ["//visibility:public"],
+)
+
+cue_exported_files(
+    name = "cue_v2beta1_exported_files",
+    module = "//test/testdata/gazelle/cue.mod:cue.mod",
+    output_format = "json",
+    visibility = ["//visibility:public"],
+    deps = ["//test/testdata/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/apis/meta/v1:cue_v1_instance"],
 )

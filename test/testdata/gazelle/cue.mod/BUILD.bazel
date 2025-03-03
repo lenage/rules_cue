@@ -1,12 +1,13 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_standalone_files", "cue_module")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_module")
 
 cue_module(
     name = "cue.mod",
     visibility = ["//visibility:public"],
 )
 
-cue_exported_standalone_files(
-    name = "module_exported",
-    srcs = ["module.cue"],
-    visibility = ["//visibility:__subpackages__"],
+cue_exported_files(
+    name = "cue_module_exported_files",
+    module = "//test/testdata/gazelle/cue.mod:cue.mod",
+    output_format = "json",
+    visibility = ["//visibility:public"],
 )
