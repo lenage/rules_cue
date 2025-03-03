@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_instance", "cue_instance")
 
 cue_instance(
     name = "cue_resource_instance",
@@ -9,17 +9,12 @@ cue_instance(
         "quantity_go_gen.cue",
         "suffix_go_gen.cue",
     ],
-    visibility = ["//visibility:__subpackages__"],
+    ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
+    visibility = ["//visibility:public"],
 )
 
 cue_exported_instance(
     name = "cue_resource_instance_exported",
     instance = "cue_resource_instance",
-    visibility = ["//visibility:__subpackages__"],
-)
-
-cue_exported_files(
-    name = "cue_resource_exported_files",
-    module = "resource",
-    visibility = ["//visibility:__subpackages__"],
+    visibility = ["//visibility:public"],
 )

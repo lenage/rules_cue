@@ -5,6 +5,7 @@ cue_instance(
     name = "cue_gazelle_instance",
     package_name = "gazelle",
     srcs = ["app.cue"],
+    ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:__subpackages__"],
 )
 
@@ -16,6 +17,6 @@ cue_exported_instance(
 
 cue_exported_files(
     name = "cue_gazelle_exported_files",
-    module = "gazelle",
+    module = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:__subpackages__"],
 )

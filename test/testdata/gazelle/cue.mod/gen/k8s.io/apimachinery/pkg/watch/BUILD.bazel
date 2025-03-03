@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_instance", "cue_instance")
 
 cue_instance(
     name = "cue_watch_instance",
@@ -10,20 +10,14 @@ cue_instance(
         "streamwatcher_go_gen.cue",
         "watch_go_gen.cue",
     ],
-    visibility = ["//visibility:__subpackages__"],
+    ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
+    visibility = ["//visibility:public"],
     deps = ["@io_k8s_apimachinery//pkg/runtime:cue_runtime_instance"],
 )
 
 cue_exported_instance(
     name = "cue_watch_instance_exported",
     instance = "cue_watch_instance",
-    visibility = ["//visibility:__subpackages__"],
+    visibility = ["//visibility:public"],
     deps = ["@io_k8s_apimachinery//pkg/runtime:cue_runtime_instance"],
-)
-
-cue_exported_files(
-    name = "cue_watch_exported_files",
-    module = "watch",
-    visibility = ["//visibility:__subpackages__"],
-    deps = ["@io_k8s_apimachinery//pkg/runtime:cue_runtime_library"],
 )

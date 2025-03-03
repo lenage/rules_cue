@@ -102,17 +102,17 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 			exportedInstances[exportedInstance.Name] = exportedInstance
 
 			// Also create a cue_exported_files rule
-			exportedFilesName := tgt + "_exported_files"
-			exportedFile := &cueExportedFiles{
-				Name:    exportedFilesName,
-				Module:  "",
-				Imports: make(map[string]bool),
-			}
-			for _, imprt := range cueFile.Imports {
-				imprt := strings.Trim(imprt.Path.Value, "\"")
-				exportedFile.Imports[imprt] = true
-			}
-			exportedFiles[exportedFilesName] = exportedFile
+			// exportedFilesName := tgt + "_exported_files"
+			// exportedFile := &cueExportedFiles{
+			// 	Name:    exportedFilesName,
+			// 	Module:  "",
+			// 	Imports: make(map[string]bool),
+			// }
+			// for _, imprt := range cueFile.Imports {
+			// 	imprt := strings.Trim(imprt.Path.Value, "\"")
+			// 	exportedFile.Imports[imprt] = true
+			// }
+			// exportedFiles[exportedFilesName] = exportedFile
 		} else {
 			// For @com_github_tnarg_rules_cue - only if enabled
 			if conf.enableTnargRulesCue {
@@ -158,20 +158,20 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 			}
 
 			// Also create a cue_exported_files rule
-			exportedFilesName := fmt.Sprintf("cue_%s_exported_files", pkg)
-			exportedFile, ok := exportedFiles[exportedFilesName]
-			if !ok {
-				exportedFile = &cueExportedFiles{
-					Name:    exportedFilesName,
-					Module:  pkg,
-					Imports: make(map[string]bool),
-				}
-				exportedFiles[exportedFilesName] = exportedFile
-			}
-			for _, imprt := range cueFile.Imports {
-				imprt := strings.Trim(imprt.Path.Value, "\"")
-				exportedFile.Imports[imprt] = true
-			}
+			// exportedFilesName := fmt.Sprintf("cue_%s_exported_files", pkg)
+			// exportedFile, ok := exportedFiles[exportedFilesName]
+			// if !ok {
+			// 	exportedFile = &cueExportedFiles{
+			// 		Name:    exportedFilesName,
+			// 		Module:  pkg,
+			// 		Imports: make(map[string]bool),
+			// 	}
+			// 	exportedFiles[exportedFilesName] = exportedFile
+			// }
+			// for _, imprt := range cueFile.Imports {
+			// 	imprt := strings.Trim(imprt.Path.Value, "\"")
+			// 	exportedFile.Imports[imprt] = true
+			// }
 		}
 	}
 
@@ -204,7 +204,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		exportedInstanceName := instance.Name + "_exported"
 		exportedInstance := &cueExportedInstance{
 			Name:     exportedInstanceName,
-			Instance: instance.Name,
+			Instance: instance.TargetName(),
 			Imports:  instance.Imports,
 		}
 		res.Gen = append(res.Gen, exportedInstance.ToRule())
@@ -237,7 +237,7 @@ func findNearestCueModule(dir, rel string) string {
 			if currentRel == "." {
 				return "//:cue.mod"
 			}
-			return fmt.Sprintf("//%s:cue.mod", currentRel)
+			return fmt.Sprintf("//%s/cue.mod:cue.mod", currentRel)
 		}
 		currentDir = filepath.Dir(currentDir)
 		currentRel = filepath.Dir(currentRel)
@@ -367,20 +367,24 @@ func (ci *cueInstance) ToRule() *rule.Rule {
 	sort.Strings(ci.Srcs)
 	rule.SetAttr("srcs", ci.Srcs)
 	rule.SetAttr("package_name", ci.PackageName)
-	rule.SetAttr("visibility", []string{"//visibility:__subpackages__"})
+	rule.SetAttr("visibility", []string{"//visibility:public"})
 
 	// Set module attribute if a cue_module was found
 	if ci.Module != "" {
 		rule.SetAttr("ancestor", ci.Module)
 	}
-
-	var imprts []string
-	for imprt := range ci.Imports {
-		imprts = append(imprts, imprt)
+	var deps []string
+	for dep := range ci.Imports {
+		deps = append(deps, dep)
 	}
-	sort.Strings(imprts)
-	rule.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	sort.Strings(deps)
+	rule.SetPrivateAttr(config.GazelleImportsKey, deps)
 	return rule
+}
+
+// Implement TargetName method for cueInstance
+func (ci *cueInstance) TargetName() string {
+	return ci.Name
 }
 
 type cueExportedInstance struct {
@@ -394,12 +398,12 @@ func (cei *cueExportedInstance) ToRule() *rule.Rule {
 	var r *rule.Rule
 	if cei.Instance != "" {
 		r = rule.NewRule("cue_exported_instance", cei.Name)
-		r.SetAttr("instance", cei.Instance)
+		r.SetAttr("instance", ":"+cei.Instance)
 	} else {
 		r = rule.NewRule("cue_exported_standalone_files", cei.Name)
 		r.SetAttr("srcs", []string{cei.Src})
 	}
-	r.SetAttr("visibility", []string{"//visibility:__subpackages__"})
+	r.SetAttr("visibility", []string{"//visibility:public"})
 	var imprts []string
 	for imprt := range cei.Imports {
 		imprts = append(imprts, imprt)
@@ -418,7 +422,7 @@ type cueExportedFiles struct {
 func (cef *cueExportedFiles) ToRule() *rule.Rule {
 	r := rule.NewRule("cue_exported_files", cef.Name)
 	r.SetAttr("module", cef.Module)
-	r.SetAttr("visibility", []string{"//visibility:__subpackages__"})
+	r.SetAttr("visibility", []string{"//visibility:public"})
 	var imprts []string
 	for imprt := range cef.Imports {
 		imprts = append(imprts, imprt)
