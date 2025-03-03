@@ -18,16 +18,9 @@ cue_exported_instance(
     visibility = ["//visibility:public"],
 )
 
-cue_exported_instance(
-    name = "schema_cue_exported_instance",
-    instance = ":cue_schema_instance",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
 cue_exported_files(
     name = "schema_cue_exported_files",
-    srcs = ["interfaces_go_gen.cue"],
+    srcs = ["group_version_go_gen.cue"],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],

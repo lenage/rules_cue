@@ -15,13 +15,6 @@ cue_exported_instance(
     visibility = ["//visibility:public"],
 )
 
-cue_exported_instance(
-    name = "tool_cue_exported_instance",
-    instance = ":cue_tool_instance",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
 cue_exported_files(
     name = "tool_cue_exported_files",
     srcs = ["tool.cue"],
