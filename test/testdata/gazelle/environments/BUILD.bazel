@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_standalone_files")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_standalone_files")
 
 cue_exported_standalone_files(
     name = "dev_exported",
@@ -10,4 +10,14 @@ cue_exported_standalone_files(
     name = "prod_exported",
     srcs = ["prod.cue"],
     visibility = ["//visibility:__subpackages__"],
+)
+
+cue_exported_files(
+    name = "dev_exported_files",
+    srcs = ["dev.cue"],
+    module = "//test/testdata/gazelle/cue.mod",
+    visibility = ["//test:__subpackages__"],
+    deps = [
+        "//test/testdata/gazelle:cue_gazelle_instance",
+    ],
 )
