@@ -10,10 +10,10 @@ cue_instance(
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:public"],
     deps = [
-        "@io_k8s_api//core/v1:cue_v1_instance",
-        "@io_k8s_apimachinery//pkg/apis/meta/v1:cue_v1_instance",
-        "@io_k8s_apimachinery//pkg/runtime:cue_runtime_instance",
-        "@io_k8s_apimachinery//pkg/util/intstr:cue_intstr_instance",
+        "//test/testdata/gazelle/cue.mod/gen/k8s.io/api/core/v1:cue_v1_instance",
+        "//test/testdata/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/apis/meta/v1:cue_v1_instance",
+        "//test/testdata/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/runtime:cue_runtime_instance",
+        "//test/testdata/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/util/intstr:cue_intstr_instance",
     ],
 )
 

@@ -12,7 +12,7 @@ cue_instance(
     ],
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:public"],
-    deps = ["@io_k8s_apimachinery//pkg/runtime:cue_runtime_instance"],
+    deps = ["//test/testdata/gazelle/cue.mod/gen/k8s.io/apimachinery/pkg/runtime:cue_runtime_instance"],
 )
 
 cue_exported_instance(
