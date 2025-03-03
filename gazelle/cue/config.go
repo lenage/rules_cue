@@ -19,13 +19,14 @@ type cueConfig struct {
 	prefixRel string
 	// enableTnargRulesCue indicates whether the tnarg_rules_cue should be enabled.
 	enableTnargRulesCue bool
+	cueOutputFormat     string
 }
 
 // KnownDirectives returns a list of directive keys that this
 // Configurer can interpret. Gazelle prints errors for directives that
 // are not recognized by any Configurer.
 func (s *cueLang) KnownDirectives() []string {
-	return []string{"prefix", "cue_enable_tnarg_rules_cue"}
+	return []string{"prefix", "cue_enable_tnarg_rules_cue", "cue_output_format"}
 }
 
 // RegisterFlags registers command-line flags used by the
@@ -33,7 +34,9 @@ func (s *cueLang) KnownDirectives() []string {
 // when Gazelle starts. RegisterFlags may set an initial values in
 // Config.Exts. When flags are set, they should modify these values.
 func (s *cueLang) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
-	c.Exts[cueName] = &cueConfig{}
+	c.Exts[cueName] = &cueConfig{
+		cueOutputFormat: "json", // Set default output format to json
+	}
 }
 
 // CheckFlags validates the configuration after command line flags are
@@ -59,7 +62,9 @@ func (s *cueLang) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 func (s *cueLang) Configure(c *config.Config, rel string, f *rule.File) {
 	var conf *cueConfig
 	if raw, ok := c.Exts[cueName]; !ok {
-		conf = &cueConfig{}
+		conf = &cueConfig{
+			cueOutputFormat: "json", // Set default output format to json
+		}
 	} else {
 		tmp := *(raw.(*cueConfig))
 		conf = &tmp
@@ -85,6 +90,8 @@ func (s *cueLang) Configure(c *config.Config, rel string, f *rule.File) {
 				conf.prefixRel = rel
 			case "cue_enable_tnarg_rules_cue":
 				conf.enableTnargRulesCue = true
+			case "cue_output_format":
+				conf.cueOutputFormat = d.Value
 			}
 		}
 	}
@@ -105,5 +112,7 @@ func GetConfig(c *config.Config) *cueConfig {
 	if raw, ok := c.Exts[cueName]; ok {
 		return raw.(*cueConfig)
 	}
-	return &cueConfig{}
+	return &cueConfig{
+		cueOutputFormat: "json", // Set default output format to json
+	}
 }
