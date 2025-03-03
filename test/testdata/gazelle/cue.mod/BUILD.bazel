@@ -6,7 +6,8 @@ cue_module(
 )
 
 cue_exported_files(
-    name = "cue_module_exported_files",
+    name = "module_cue_exported_files",
+    srcs = ["module.cue"],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],

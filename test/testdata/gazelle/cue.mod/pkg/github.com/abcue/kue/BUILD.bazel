@@ -15,8 +15,16 @@ cue_exported_instance(
     visibility = ["//visibility:public"],
 )
 
+cue_exported_instance(
+    name = "kue_cue_exported_instance",
+    instance = ":cue_kue_instance",
+    output_format = "json",
+    visibility = ["//visibility:public"],
+)
+
 cue_exported_files(
-    name = "cue_kue_exported_files",
+    name = "kue_cue_exported_files",
+    srcs = ["kue.cue"],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],

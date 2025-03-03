@@ -1,31 +1,19 @@
 load("@rules_cue//cue:cue.bzl", "cue_exported_files")
 
 cue_exported_files(
-    name = "prod_exported",
-    srcs = ["prod.cue"],
-    module = "//test/testdata/gazelle/cue.mod",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
-cue_exported_files(
-    name = "dev_exported",
+    name = "dev_cue_exported_files",
     srcs = ["dev.cue"],
-    module = "//test/testdata/gazelle/cue.mod",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
-cue_exported_files(
-    name = "cue_dev_exported_files",
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
+    deps = ["//test/testdata/gazelle:cue_gazelle_instance"],
 )
 
 cue_exported_files(
-    name = "cue_prod_exported_files",
+    name = "prod_cue_exported_files",
+    srcs = ["prod.cue"],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
+    deps = ["//test/testdata/gazelle:cue_gazelle_instance"],
 )
