@@ -89,6 +89,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		// cue_exported_instance: Takes a CUE instance and exports it to a specified output format, preserving the structure defined in the instance
 		"cue_exported_instance": {
 			MatchAttrs: []string{"instance"},
 			NonEmptyAttrs: map[string]bool{
@@ -99,8 +100,8 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 				"output_format": false,
 				"result":        true,
 			},
-			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		// cue_consolidated_instance: Takes a CUE instance (a package with imports) and outputs a consolidated definition with all dependencies resolved.
 		"cue_consolidated_instance": {
 			MatchAttrs: []string{"instance"},
 			NonEmptyAttrs: map[string]bool{
@@ -108,6 +109,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		// cue_consolidated_files: Consolidates CUE files that are part of a module into a single output file in a specified format.
 		"cue_consolidated_files": {
 			NonEmptyAttrs: map[string]bool{
 				"deps": true,
@@ -118,6 +120,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		//cue_consolidated_standalone_files: Processes standalone CUE files (not part of a module) and outputs a consolidated definition in a specified format.
 		"cue_consolidated_standalone_files": {
 			MergeableAttrs: map[string]bool{
 				"output_format": false,
@@ -125,6 +128,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		//cue_exported_files: Exports CUE files that are part of a CUE module to a specified output format (JSON, YAML, etc.).
 		"cue_exported_files": {
 			NonEmptyAttrs: map[string]bool{
 				"deps":   true,
@@ -137,6 +141,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		// cue_exported_standalone_files processes CUE files without requiring them to be part of a CUE module structure.
 		"cue_exported_standalone_files": {
 			MergeableAttrs: map[string]bool{
 				"escape":        true,

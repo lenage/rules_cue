@@ -35,6 +35,83 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	// Get the configuration
 	conf := GetConfig(args.Config)
 
+	// Parse CUE files
+	cueFiles := parseCueFiles(args)
+	if len(cueFiles) == 0 {
+		return language.GenerateResult{}
+	}
+
+	// Setup context for rule generation
+	ctx := &ruleGenerationContext{
+		config:            conf,
+		implicitPkgName:   path.Base(args.Rel),
+		baseImportPath:    computeImportPath(args),
+		isCueModDir:       path.Base(args.Dir) == "cue.mod",
+		moduleLabel:       findNearestCueModule(args.Dir, args.Rel),
+		libraries:         make(map[string]*cueLibrary),
+		exports:           make(map[string]*cueExport),
+		instances:         make(map[string]*cueInstance),
+		exportedInstances: make(map[string]*cueExportedInstance),
+		exportedFiles:     make(map[string]*cueExportedFiles),
+		//consolidatedInstances: make(map[string]*cueConsolidatedInstance),
+		enableTnargRulesCue: conf.enableTnargRulesCue,
+	}
+
+	// Process each CUE file
+	for fname, cueFile := range cueFiles {
+		pkg := cueFile.PackageName()
+		imports := extractImports(cueFile)
+
+		if pkg == "" {
+			processStandaloneFile(ctx, fname, imports)
+		} else {
+			processPackageFile(ctx, fname, pkg, imports)
+		}
+	}
+
+	// Generate rules
+	var res language.GenerateResult
+
+	// Generate cue_module rule if in cue.mod directory
+	if ctx.isCueModDir {
+		moduleRule := generateCueModuleRule(args.Rel)
+		res.Gen = append(res.Gen, moduleRule)
+	}
+
+	// Generate all rules
+	res.Gen = append(res.Gen, generateRules(ctx)...)
+
+	// Set imports for dependency resolution
+	res.Imports = make([]interface{}, len(res.Gen))
+	for i, r := range res.Gen {
+		res.Imports[i] = r.PrivateAttr(config.GazelleImportsKey)
+	}
+
+	// Generate empty rules
+	res.Empty = generateEmpty(args.File, ctx.libraries, ctx.exports, ctx.instances,
+		ctx.exportedInstances, ctx.exportedFiles, ctx.enableTnargRulesCue, ctx.isCueModDir)
+
+	return res
+}
+
+// Context to hold all the data needed during rule generation
+type ruleGenerationContext struct {
+	config                *cueConfig
+	implicitPkgName       string
+	baseImportPath        string
+	isCueModDir           bool
+	moduleLabel           string
+	libraries             map[string]*cueLibrary
+	exports               map[string]*cueExport
+	instances             map[string]*cueInstance
+	exportedInstances     map[string]*cueExportedInstance
+	exportedFiles         map[string]*cueExportedFiles
+	consolidatedInstances map[string]*cueConsolidatedInstance
+	enableTnargRulesCue   bool
+}
+
+// Parse all CUE files in the directory
+func parseCueFiles(args language.GenerateArgs) map[string]*ast.File {
 	cueFiles := make(map[string]*ast.File)
 	for _, f := range append(args.RegularFiles, args.GenFiles...) {
 		// Only generate Cue entries for cue files (.cue)
@@ -50,182 +127,191 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		}
 		cueFiles[f] = cueFile
 	}
+	return cueFiles
+}
 
-	implicitPkgName := path.Base(args.Rel)
-	baseImportPath := computeImportPath(args)
+// Extract imports from a CUE file
+func extractImports(cueFile *ast.File) []string {
+	var imports []string
+	for _, imprt := range cueFile.Imports {
+		imports = append(imports, strings.Trim(imprt.Path.Value, "\""))
+	}
+	return imports
+}
 
-	// categorize cue files into export and library sources
-	// cue_libary names are based on cue package name.
-	libraries := make(map[string]*cueLibrary)
-	exports := make(map[string]*cueExport)
+// Process a standalone CUE file (no package)
+func processStandaloneFile(ctx *ruleGenerationContext, fname string, imports []string) {
+	tgt := exportName(fname)
 
-	// For @rules_cue rules
-	instances := make(map[string]*cueInstance)
-	exportedInstances := make(map[string]*cueExportedInstance)
-	exportedFiles := make(map[string]*cueExportedFiles)
+	// Only create tnarg_rules_cue rules if enabled
+	if ctx.enableTnargRulesCue {
+		export := &cueExport{
+			Name:    tgt,
+			Src:     fname,
+			Imports: make(map[string]bool),
+		}
+		for _, imprt := range imports {
+			export.Imports[imprt] = true
+		}
+		ctx.exports[tgt] = export
+	}
 
-	// Check if current directory is cue.mod
-	isCueModDir := path.Base(args.Dir) == "cue.mod"
+	// Process exported files
+	exportedFilesName := fmt.Sprintf("cue_%s_exported_files", tgt)
+	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
+	if !ok {
+		exportedFile = &cueExportedFiles{
+			Name:         exportedFilesName,
+			Module:       ctx.moduleLabel,
+			Imports:      make(map[string]bool),
+			OutputFormat: ctx.config.cueOutputFormat,
+		}
+		ctx.exportedFiles[exportedFilesName] = exportedFile
+	}
+	for _, imprt := range imports {
+		exportedFile.Imports[imprt] = true
+	}
+}
 
-	// Find the nearest cue_module by looking up the directory tree
-	moduleLabel := findNearestCueModule(args.Dir, args.Rel)
+// Process a CUE file with a package
+func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, imports []string) {
+	// For @com_github_tnarg_rules_cue - only if enabled
+	if ctx.enableTnargRulesCue {
+		processTnargLibrary(ctx, fname, pkg, imports)
+	}
 
-	for fname, cueFile := range cueFiles {
-		pkg := cueFile.PackageName()
-		if pkg == "" {
-			tgt := exportName(fname)
+	// Process instance
+	instanceTgt := fmt.Sprintf("cue_%s_instance", pkg)
+	instance, ok := ctx.instances[instanceTgt]
+	if !ok {
+		instance = &cueInstance{
+			Name:        instanceTgt,
+			PackageName: pkg,
+			Imports:     make(map[string]bool),
+			Module:      ctx.moduleLabel,
+		}
+		ctx.instances[instanceTgt] = instance
+	}
+	instance.Srcs = append(instance.Srcs, fname)
+	for _, imprt := range imports {
+		instance.Imports[imprt] = true
+	}
 
-			// Only create tnarg_rules_cue rules if enabled
-			if conf.enableTnargRulesCue {
-				export := &cueExport{
-					Name:    tgt,
-					Src:     fname,
-					Imports: make(map[string]bool),
-				}
-				for _, imprt := range cueFile.Imports {
-					imprt := strings.Trim(imprt.Path.Value, "\"")
-					export.Imports[imprt] = true
-				}
-				exports[tgt] = export
+	// Process exported files
+	exportedFilesName := fmt.Sprintf("cue_%s_exported_files", pkg)
+	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
+	if !ok {
+		exportedFile = &cueExportedFiles{
+			Name:         exportedFilesName,
+			Module:       ctx.moduleLabel,
+			Imports:      make(map[string]bool),
+			OutputFormat: ctx.config.cueOutputFormat,
+		}
+		ctx.exportedFiles[exportedFilesName] = exportedFile
+	}
+	for _, imprt := range imports {
+		exportedFile.Imports[imprt] = true
+	}
+
+	if len(ctx.consolidatedInstances) > 0 {
+		// Process consolidated instance
+		consolidatedName := fmt.Sprintf("cue_%s_consolidated", pkg)
+		consolidated, ok := ctx.consolidatedInstances[consolidatedName]
+		if !ok {
+			consolidated = &cueConsolidatedInstance{
+				Name:        consolidatedName,
+				Instance:    instanceTgt,
+				PackageName: pkg,
+				Imports:     make(map[string]bool),
 			}
+			ctx.consolidatedInstances[consolidatedName] = consolidated
+		}
+		for _, imprt := range imports {
+			consolidated.Imports[imprt] = true
+		}
+	}
+}
 
-			// Always create rules_cue rules
-			exportedInstance := &cueExportedInstance{
-				Name:    tgt + "_exported",
-				Src:     fname,
-				Imports: make(map[string]bool),
-			}
-			for _, imprt := range cueFile.Imports {
-				imprt := strings.Trim(imprt.Path.Value, "\"")
-				exportedInstance.Imports[imprt] = true
-			}
-			exportedInstances[exportedInstance.Name] = exportedInstance
-
-			// Also create a cue_exported_files rule
-			// exportedFilesName := tgt + "_exported_files"
-			// exportedFile := &cueExportedFiles{
-			// 	Name:    exportedFilesName,
-			// 	Module:  "",
-			// 	Imports: make(map[string]bool),
-			// }
-			// for _, imprt := range cueFile.Imports {
-			// 	imprt := strings.Trim(imprt.Path.Value, "\"")
-			// 	exportedFile.Imports[imprt] = true
-			// }
-			// exportedFiles[exportedFilesName] = exportedFile
+// Process a library for tnarg rules
+func processTnargLibrary(ctx *ruleGenerationContext, fname string, pkg string, imports []string) {
+	tgt := fmt.Sprintf("cue_%s_library", pkg)
+	lib, ok := ctx.libraries[tgt]
+	if !ok {
+		var importPath string
+		if pkg == ctx.implicitPkgName {
+			importPath = ctx.baseImportPath
 		} else {
-			// For @com_github_tnarg_rules_cue - only if enabled
-			if conf.enableTnargRulesCue {
-				tgt := fmt.Sprintf("cue_%s_library", pkg)
-				lib, ok := libraries[tgt]
-				if !ok {
-					var importPath string
-					if pkg == implicitPkgName {
-						importPath = baseImportPath
-					} else {
-						importPath = fmt.Sprintf("%s:%s", baseImportPath, pkg)
-					}
-					lib = &cueLibrary{
-						Name:       tgt,
-						ImportPath: importPath,
-						Imports:    make(map[string]bool),
-					}
-					libraries[tgt] = lib
-				}
-				lib.Srcs = append(lib.Srcs, fname)
-				for _, imprt := range cueFile.Imports {
-					imprt := strings.Trim(imprt.Path.Value, "\"")
-					lib.Imports[imprt] = true
-				}
-			}
-
-			// For @rules_cue - always generate these
-			instanceTgt := fmt.Sprintf("cue_%s_instance", pkg)
-			instance, ok := instances[instanceTgt]
-			if !ok {
-				instance = &cueInstance{
-					Name:        instanceTgt,
-					PackageName: pkg,
-					Imports:     make(map[string]bool),
-					Module:      moduleLabel,
-				}
-				instances[instanceTgt] = instance
-			}
-			instance.Srcs = append(instance.Srcs, fname)
-			for _, imprt := range cueFile.Imports {
-				imprt := strings.Trim(imprt.Path.Value, "\"")
-				instance.Imports[imprt] = true
-			}
-
-			// Also create a cue_exported_files rule
-			// exportedFilesName := fmt.Sprintf("cue_%s_exported_files", pkg)
-			// exportedFile, ok := exportedFiles[exportedFilesName]
-			// if !ok {
-			// 	exportedFile = &cueExportedFiles{
-			// 		Name:    exportedFilesName,
-			// 		Module:  pkg,
-			// 		Imports: make(map[string]bool),
-			// 	}
-			// 	exportedFiles[exportedFilesName] = exportedFile
-			// }
-			// for _, imprt := range cueFile.Imports {
-			// 	imprt := strings.Trim(imprt.Path.Value, "\"")
-			// 	exportedFile.Imports[imprt] = true
-			// }
+			importPath = fmt.Sprintf("%s:%s", ctx.baseImportPath, pkg)
 		}
-	}
-
-	var res language.GenerateResult
-
-	// Generate cue_module rule if current directory is cue.mod
-	if isCueModDir {
-		cueModule := &cueModule{
-			Name: "cue.mod",
+		lib = &cueLibrary{
+			Name:       tgt,
+			ImportPath: importPath,
+			Imports:    make(map[string]bool),
 		}
-		res.Gen = append(res.Gen, cueModule.ToRule())
+		ctx.libraries[tgt] = lib
 	}
+	lib.Srcs = append(lib.Srcs, fname)
+	for _, imprt := range imports {
+		lib.Imports[imprt] = true
+	}
+}
+
+// Generate a cue_module rule
+func generateCueModuleRule(rel string) *rule.Rule {
+	cueModule := &cueModule{
+		Name: "cue.mod",
+	}
+	moduleRule := cueModule.ToRule()
+
+	// Register this cue_module for later use in resolution
+	RegisterCueModule(fmt.Sprintf("//%s:cue.mod", rel), rel)
+
+	return moduleRule
+}
+
+// Generate all rules from the context
+func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
+	var rules []*rule.Rule
 
 	// Generate @com_github_tnarg_rules_cue rules only if enabled
-	if conf.enableTnargRulesCue {
-		for _, library := range libraries {
-			res.Gen = append(res.Gen, library.ToRule())
+	if ctx.enableTnargRulesCue {
+		for _, library := range ctx.libraries {
+			rules = append(rules, library.ToRule())
 		}
 
-		for _, export := range exports {
-			res.Gen = append(res.Gen, export.ToRule())
+		for _, export := range ctx.exports {
+			rules = append(rules, export.ToRule())
 		}
 	}
 
-	// Generate @rules_cue rules - always generate these
-	for _, instance := range instances {
-		res.Gen = append(res.Gen, instance.ToRule())
+	// Generate @rules_cue rules
+	for _, instance := range ctx.instances {
+		rules = append(rules, instance.ToRule())
 
-		// Also create a cue_exported_instance rule for each instance
+		// Create a cue_exported_instance rule for each instance
 		exportedInstanceName := instance.Name + "_exported"
 		exportedInstance := &cueExportedInstance{
-			Name:     exportedInstanceName,
-			Instance: instance.TargetName(),
-			Imports:  instance.Imports,
+			Name:         exportedInstanceName,
+			Instance:     instance.TargetName(),
+			Imports:      instance.Imports,
+			OutputFormat: ctx.config.cueOutputFormat,
 		}
-		res.Gen = append(res.Gen, exportedInstance.ToRule())
+		rules = append(rules, exportedInstance.ToRule())
 	}
 
-	for _, exportedInstance := range exportedInstances {
-		res.Gen = append(res.Gen, exportedInstance.ToRule())
+	for _, exportedInstance := range ctx.exportedInstances {
+		rules = append(rules, exportedInstance.ToRule())
 	}
 
-	for _, exportedFile := range exportedFiles {
-		res.Gen = append(res.Gen, exportedFile.ToRule())
+	for _, exportedFile := range ctx.exportedFiles {
+		rules = append(rules, exportedFile.ToRule())
 	}
 
-	res.Imports = make([]interface{}, len(res.Gen))
-	for i, r := range res.Gen {
-		res.Imports[i] = r.PrivateAttr(config.GazelleImportsKey)
+	for _, consolidated := range ctx.consolidatedInstances {
+		rules = append(rules, consolidated.ToRule())
 	}
 
-	res.Empty = generateEmpty(args.File, libraries, exports, instances, exportedInstances, exportedFiles, conf.enableTnargRulesCue, isCueModDir)
-
-	return res
+	return rules
 }
 
 // findNearestCueModule searches for a cue.mod directory up the directory tree
@@ -388,10 +474,11 @@ func (ci *cueInstance) TargetName() string {
 }
 
 type cueExportedInstance struct {
-	Name     string
-	Instance string
-	Src      string // Used for standalone files
-	Imports  map[string]bool
+	Name         string
+	Instance     string
+	Src          string
+	Imports      map[string]bool
+	OutputFormat string
 }
 
 func (cei *cueExportedInstance) ToRule() *rule.Rule {
@@ -399,26 +486,37 @@ func (cei *cueExportedInstance) ToRule() *rule.Rule {
 	if cei.Instance != "" {
 		r = rule.NewRule("cue_exported_instance", cei.Name)
 		r.SetAttr("instance", ":"+cei.Instance)
-		// r.SetAttr("path", []string{"extras:"})
-		// r.SetAttr("qualified_srcs", map[string]string{"extras": "yaml"})
 	} else {
 		r = rule.NewRule("cue_exported_standalone_files", cei.Name)
 		r.SetAttr("srcs", []string{cei.Src})
 	}
-	r.SetAttr("visibility", []string{"//visibility:__subpackages__"})
+	r.SetAttr("visibility", []string{"//visibility:public"})
+
+	// Use the outputFormat field
+	if cei.OutputFormat != "" {
+		r.SetAttr("output_format", cei.OutputFormat)
+	}
+
 	return r
 }
 
 type cueExportedFiles struct {
-	Name    string
-	Module  string
-	Imports map[string]bool
+	Name         string
+	Module       string
+	Imports      map[string]bool
+	OutputFormat string
 }
 
 func (cef *cueExportedFiles) ToRule() *rule.Rule {
 	r := rule.NewRule("cue_exported_files", cef.Name)
 	r.SetAttr("module", cef.Module)
 	r.SetAttr("visibility", []string{"//visibility:public"})
+
+	// Use the outputFormat field
+	if cef.OutputFormat != "" {
+		r.SetAttr("output_format", cef.OutputFormat)
+	}
+
 	var imprts []string
 	for imprt := range cef.Imports {
 		imprts = append(imprts, imprt)
@@ -436,5 +534,37 @@ type cueModule struct {
 func (cm *cueModule) ToRule() *rule.Rule {
 	r := rule.NewRule("cue_module", cm.Name)
 	r.SetAttr("visibility", []string{"//visibility:public"})
+	return r
+}
+
+// cueConsolidatedInstance definition
+type cueConsolidatedInstance struct {
+	Name        string
+	Instance    string
+	Src         string
+	PackageName string
+	Imports     map[string]bool
+}
+
+func (cci *cueConsolidatedInstance) ToRule() *rule.Rule {
+	var r *rule.Rule
+	if cci.Instance != "" {
+		r = rule.NewRule("cue_consolidated_instance", cci.Name)
+		r.SetAttr("instance", ":"+cci.Instance)
+	} else {
+		r = rule.NewRule("cue_consolidated_standalone_files", cci.Name)
+		r.SetAttr("srcs", []string{cci.Src})
+	}
+	r.SetAttr("visibility", []string{"//visibility:public"})
+
+	// Always set output_format to "cue" for consolidated instances
+	r.SetAttr("output_format", "cue")
+
+	var imprts []string
+	for imprt := range cci.Imports {
+		imprts = append(imprts, imprt)
+	}
+	sort.Strings(imprts)
+	r.SetPrivateAttr(config.GazelleImportsKey, imprts)
 	return r
 }
