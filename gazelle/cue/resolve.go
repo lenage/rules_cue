@@ -36,7 +36,7 @@ var (
 func init() {
 	cueModules = make(map[string]*CueModuleInfo)
 	cueModIndex = make(map[string]string)
-	debugModIndex = false
+	debugModIndex = true
 }
 
 // RegisterCueModule registers a cue_module for later use in resolution
@@ -212,8 +212,17 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 	r.DelAttr("deps")
 	depSet := make(map[string]bool)
 
-	// Get the ancestor attribute if available
-	ancestorModule := r.AttrString("ancestor")
+	// Get the ancestor attribute for cue_instance or module attribute for cue_exported_files
+	var cueModule string
+	if r.Kind() == "cue_instance" {
+		cueModule = r.AttrString("ancestor")
+	} else if r.Kind() == "cue_exported_files" {
+		cueModule = r.AttrString("module")
+	}
+
+	if debugModIndex {
+		log.Printf("DEBUG: kind: %s, cueModule: %s\n", r.Kind(), cueModule)
+	}
 
 	for _, imp := range imps {
 		if _, ok := stdlib[imp]; ok {
@@ -233,9 +242,9 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 		cueModulesMu.RUnlock()
 
 		// If not found in index but we have an ancestor module, try to resolve relative to that
-		if ancestorModule != "" {
+		if cueModule != "" {
 			cueModulesMu.RLock()
-			if moduleInfo, ok := cueModules[ancestorModule]; ok {
+			if moduleInfo, ok := cueModules[cueModule]; ok {
 				// Try to find the import in this module's gen directory
 				possiblePath := filepath.Join(moduleInfo.GenDir, strings.ReplaceAll(imp, "/", string(filepath.Separator)))
 				if _, err := os.Stat(possiblePath); err == nil {
