@@ -157,13 +157,14 @@ func processStandaloneFile(ctx *ruleGenerationContext, fname string, imports []s
 	}
 
 	// Process exported files
-	exportedFilesName := fmt.Sprintf("cue_%s_exported_files", tgt)
+	exportedFilesName := fmt.Sprintf("%s_cue_exported_files", tgt)
 	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
 	if !ok {
 		exportedFile = &cueExportedFiles{
 			Name:         exportedFilesName,
 			Module:       ctx.moduleLabel,
 			Imports:      make(map[string]bool),
+			Srcs:         []string{fname},
 			OutputFormat: ctx.config.cueOutputFormat,
 		}
 		ctx.exportedFiles[exportedFilesName] = exportedFile
@@ -197,17 +198,36 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 		instance.Imports[imprt] = true
 	}
 
+	// Process exported instance
+	exportedInstanceName := fmt.Sprintf("%s_cue_exported_instance", pkg)
+	exportedInstance, ok := ctx.exportedInstances[exportedInstanceName]
+	if !ok {
+		exportedInstance = &cueExportedInstance{
+			Name:         exportedInstanceName,
+			Instance:     instanceTgt,
+			Imports:      make(map[string]bool),
+			OutputFormat: ctx.config.cueOutputFormat,
+		}
+		ctx.exportedInstances[exportedInstanceName] = exportedInstance
+	}
+	for _, imprt := range imports {
+		exportedInstance.Imports[imprt] = true
+	}
+
 	// Process exported files
-	exportedFilesName := fmt.Sprintf("cue_%s_exported_files", pkg)
+	exportedFilesName := fmt.Sprintf("%s_cue_exported_files", pkg)
 	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
 	if !ok {
 		exportedFile = &cueExportedFiles{
 			Name:         exportedFilesName,
-			Module:       ctx.moduleLabel,
+			Module:       ctx.moduleLabel, //TODO(yuan): should be package or module label?
 			Imports:      make(map[string]bool),
 			OutputFormat: ctx.config.cueOutputFormat,
 		}
 		ctx.exportedFiles[exportedFilesName] = exportedFile
+		if len(instance.Srcs) > 0 {
+			exportedFile.Srcs = instance.Srcs
+		}
 	}
 	for _, imprt := range imports {
 		exportedFile.Imports[imprt] = true
@@ -500,9 +520,38 @@ func (cei *cueExportedInstance) ToRule() *rule.Rule {
 	return r
 }
 
+// cueExportedFiles represents a cue_exported_files rule that exports CUE files to various formats.
+// It supports exporting multiple source files with configurable output formats, expressions, and injected values.
+//
+// Example:
+// ```python
+// cue_exported_files(
+//
+//	name = "config_exported",
+//	module = ":cue.mod",
+//	srcs = [
+//	    "config.cue",
+//	    "defaults.cue",
+//	],
+//	qualified_srcs = {
+//	    "values.yaml": "yaml",
+//	},
+//	output_format = "yaml",
+//	result = "config.yaml",
+//	expression = "config",
+//	inject = {
+//	    "environment": "production",
+//	    "version": "1.2.3",
+//	},
+//	inject_system_variables = True,
+//	with_context = True,
+//	visibility = ["//visibility:public"],
+//
+// )
 type cueExportedFiles struct {
 	Name         string
 	Module       string
+	Srcs         []string
 	Imports      map[string]bool
 	OutputFormat string
 }
@@ -511,6 +560,7 @@ func (cef *cueExportedFiles) ToRule() *rule.Rule {
 	r := rule.NewRule("cue_exported_files", cef.Name)
 	r.SetAttr("module", cef.Module)
 	r.SetAttr("visibility", []string{"//visibility:public"})
+	r.SetAttr("srcs", cef.Srcs)
 
 	// Use the outputFormat field
 	if cef.OutputFormat != "" {

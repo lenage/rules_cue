@@ -11,6 +11,7 @@ cue_instance(
 
 cue_exported_files(
     name = "cue_gazelle_exported_files",
+    srcs = ["app.cue"],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],

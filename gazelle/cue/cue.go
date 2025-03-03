@@ -130,6 +130,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 		},
 		//cue_exported_files: Exports CUE files that are part of a CUE module to a specified output format (JSON, YAML, etc.).
 		"cue_exported_files": {
+			MatchAttrs: []string{"srcs", "module"},
 			NonEmptyAttrs: map[string]bool{
 				"deps":   true,
 				"module": true,
