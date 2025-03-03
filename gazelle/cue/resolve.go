@@ -3,9 +3,12 @@ package cuelang
 import (
 	"fmt"
 	"log"
+	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/bazelbuild/bazel-gazelle/config"
 	"github.com/bazelbuild/bazel-gazelle/label"
@@ -14,6 +17,132 @@ import (
 	"github.com/bazelbuild/bazel-gazelle/resolve"
 	"github.com/bazelbuild/bazel-gazelle/rule"
 )
+
+// CueModuleInfo stores information about a cue_module
+type CueModuleInfo struct {
+	Label  string // Bazel label of the cue_module
+	Dir    string // Directory path where cue.mod is located
+	GenDir string // Path to the cue.mod/gen directory
+}
+
+var (
+	cueModulesMu  sync.RWMutex
+	cueModules    map[string]*CueModuleInfo // Maps module label to info
+	cueModIndex   map[string]string         // Maps import paths to Bazel targets
+	debugModIndex bool
+)
+
+// Initialize the maps
+func init() {
+	cueModules = make(map[string]*CueModuleInfo)
+	cueModIndex = make(map[string]string)
+	debugModIndex = false
+}
+
+// RegisterCueModule registers a cue_module for later use in resolution
+func RegisterCueModule(label, dir string) {
+	cueModulesMu.Lock()
+	defer cueModulesMu.Unlock()
+
+	cueModules[label] = &CueModuleInfo{
+		Label:  label,
+		Dir:    dir,
+		GenDir: filepath.Join(dir, "gen"),
+	}
+
+	// Index the gen directory if it exists
+	if _, err := os.Stat(cueModules[label].GenDir); err == nil {
+		indexCueModuleGen(cueModules[label])
+	}
+}
+
+// indexCueModuleGen builds an index of available targets in a cue.mod/gen directory
+func indexCueModuleGen(moduleInfo *CueModuleInfo) {
+	err := filepath.Walk(moduleInfo.GenDir, func(filePath string, fileInfo os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		// Skip directories
+		if fileInfo.IsDir() {
+			return nil
+		}
+
+		// Only look at .cue files to identify packages
+		if !strings.HasSuffix(filePath, ".cue") {
+			return nil
+		}
+
+		// Get the relative path from cue.mod/gen
+		relPath, err := filepath.Rel(moduleInfo.GenDir, filepath.Dir(filePath))
+		if err != nil {
+			return err
+		}
+
+		// Convert to import path format
+		importPath := strings.ReplaceAll(relPath, string(filepath.Separator), "/")
+
+		// Extract package name from the file
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil
+		}
+
+		// Simple parsing to find package name
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "package ") {
+				pkgName := strings.TrimSpace(strings.TrimPrefix(line, "package "))
+
+				// Extract module path from label (removing the target part)
+				modulePath := moduleInfo.Label
+				if idx := strings.LastIndex(modulePath, ":"); idx >= 0 {
+					modulePath = modulePath[:idx]
+				}
+
+				// Create target labels for both instance and library with module path prefix
+				instanceTarget := fmt.Sprintf("%s/gen/%s:cue_%s_instance", modulePath, importPath, pkgName)
+
+				// Add to index with full import path
+				cueModIndex[importPath] = instanceTarget
+
+				// Also index by package name for simpler imports
+				if pkgName != "" {
+					cueModIndex[pkgName] = instanceTarget
+				}
+
+				// For k8s.io and other common imports, add special handling
+				if strings.Contains(importPath, "k8s.io/") ||
+					strings.Contains(importPath, "sigs.k8s.io/") ||
+					strings.Contains(importPath, "github.com/") {
+					fullImportPath := importPath
+					if !strings.HasPrefix(fullImportPath, "k8s.io/") &&
+						!strings.HasPrefix(fullImportPath, "sigs.k8s.io/") &&
+						!strings.HasPrefix(fullImportPath, "github.com/") {
+						// Extract the domain part from the path
+						parts := strings.SplitN(importPath, "/", 3)
+						if len(parts) >= 3 {
+							fullImportPath = strings.Join(parts, "/")
+						}
+					}
+					cueModIndex[fullImportPath] = instanceTarget
+				}
+
+				if debugModIndex {
+					log.Printf("Debug: Indexed CUE module target: %s -> %s", importPath, instanceTarget)
+				}
+				break
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("Warning: Error walking cue.mod directory: %v", err)
+	}
+}
 
 // Imports returns a list of ImportSpecs that can be used to import
 // the rule r. This is used to populate RuleIndex.
@@ -39,6 +168,13 @@ func (cl *cueLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 					Imp:  pkgName,
 				},
 			}
+		}
+	case "cue_module":
+		// Register this cue_module for later use in resolution
+		if f != nil && f.Pkg != "" {
+			moduleLabel := "//" + f.Pkg + ":" + r.Name()
+			moduleDir := filepath.Join(c.RepoRoot, f.Pkg)
+			RegisterCueModule(moduleLabel, moduleDir)
 		}
 	}
 	return nil
@@ -75,12 +211,52 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 	imps := imports.([]string)
 	r.DelAttr("deps")
 	depSet := make(map[string]bool)
+
+	// Get the ancestor attribute if available
+	ancestorModule := r.AttrString("ancestor")
+
 	for _, imp := range imps {
 		if _, ok := stdlib[imp]; ok {
 			continue
 		}
 
-		res := ix.FindRulesByImport(
+		// First check in cue.mod index
+		cueModulesMu.RLock()
+		if target, ok := cueModIndex[imp]; ok {
+			if debugModIndex {
+				log.Printf("Debug: Found import %s in cue.mod index: %s", imp, target)
+			}
+			depSet[target] = true
+			cueModulesMu.RUnlock()
+			continue
+		}
+		cueModulesMu.RUnlock()
+
+		// If not found in index but we have an ancestor module, try to resolve relative to that
+		if ancestorModule != "" {
+			cueModulesMu.RLock()
+			if moduleInfo, ok := cueModules[ancestorModule]; ok {
+				// Try to find the import in this module's gen directory
+				possiblePath := filepath.Join(moduleInfo.GenDir, strings.ReplaceAll(imp, "/", string(filepath.Separator)))
+				if _, err := os.Stat(possiblePath); err == nil {
+					// Extract package name - simplified approach
+					pkgName := path.Base(imp)
+					target := fmt.Sprintf("//cue.mod/gen/%s:cue_%s_instance",
+						strings.ReplaceAll(imp, "/", string(filepath.Separator)), pkgName)
+					depSet[target] = true
+					if debugModIndex {
+						log.Printf("Debug: Resolved import %s via ancestor module to %s", imp, target)
+					}
+					cueModulesMu.RUnlock()
+					continue
+				}
+			}
+			cueModulesMu.RUnlock()
+		}
+
+		// Try to find rules with matching imports in the index
+		// for example @io_k8s_api/apps/v1:cue_v1_instance
+		res := ix.FindRulesByImportWithConfig(c,
 			resolve.ImportSpec{
 				Lang: cueName,
 				Imp:  imp,
