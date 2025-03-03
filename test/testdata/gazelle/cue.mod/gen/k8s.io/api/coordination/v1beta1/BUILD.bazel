@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_instance")
 
 cue_instance(
     name = "cue_v1beta1_instance",
@@ -15,16 +15,12 @@ cue_instance(
     ],
 )
 
-cue_exported_instance(
-    name = "cue_v1beta1_instance_exported",
-    instance = ":cue_v1beta1_instance",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
 cue_exported_files(
     name = "v1beta1_cue_exported_files",
-    srcs = ["register_go_gen.cue"],
+    srcs = [
+        "register_go_gen.cue",
+        "types_go_gen.cue",
+    ],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],

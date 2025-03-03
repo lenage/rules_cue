@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_instance")
 
 cue_instance(
     name = "cue_tue_instance",
@@ -6,13 +6,7 @@ cue_instance(
     srcs = ["tue.cue"],
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:public"],
-)
-
-cue_exported_instance(
-    name = "cue_tue_instance_exported",
-    instance = ":cue_tue_instance",
-    output_format = "json",
-    visibility = ["//visibility:public"],
+    deps = ["//test/testdata/gazelle/cue.mod/pkg/github.com/abcue/tool:cue_tool_instance"],
 )
 
 cue_exported_files(
@@ -21,4 +15,5 @@ cue_exported_files(
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
+    deps = ["//test/testdata/gazelle/cue.mod/pkg/github.com/abcue/tool:cue_tool_instance"],
 )

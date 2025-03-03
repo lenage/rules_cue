@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_instance")
 
 cue_instance(
     name = "cue_runtime_instance",
@@ -22,16 +22,23 @@ cue_instance(
     visibility = ["//visibility:public"],
 )
 
-cue_exported_instance(
-    name = "cue_runtime_instance_exported",
-    instance = ":cue_runtime_instance",
-    output_format = "json",
-    visibility = ["//visibility:public"],
-)
-
 cue_exported_files(
     name = "runtime_cue_exported_files",
-    srcs = ["doc_go_gen.cue"],
+    srcs = [
+        "allocator_go_gen.cue",
+        "codec_go_gen.cue",
+        "conversion_go_gen.cue",
+        "converter_go_gen.cue",
+        "doc_go_gen.cue",
+        "embedded_go_gen.cue",
+        "helper_go_gen.cue",
+        "interfaces_go_gen.cue",
+        "negotiate_go_gen.cue",
+        "splice_go_gen.cue",
+        "swagger_doc_generator_go_gen.cue",
+        "types_go_gen.cue",
+        "types_proto_go_gen.cue",
+    ],
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
