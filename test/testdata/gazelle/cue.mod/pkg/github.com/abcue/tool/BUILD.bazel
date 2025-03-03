@@ -4,17 +4,18 @@ cue_instance(
     name = "cue_tool_instance",
     package_name = "tool",
     srcs = ["tool.cue"],
-    visibility = ["//visibility:__subpackages__"],
+    ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
+    visibility = ["//visibility:public"],
 )
 
 cue_exported_instance(
     name = "cue_tool_instance_exported",
     instance = "cue_tool_instance",
-    visibility = ["//visibility:__subpackages__"],
+    visibility = ["//visibility:public"],
 )
 
 cue_exported_files(
     name = "cue_tool_exported_files",
     module = "tool",
-    visibility = ["//visibility:__subpackages__"],
+    visibility = ["//visibility:public"],
 )

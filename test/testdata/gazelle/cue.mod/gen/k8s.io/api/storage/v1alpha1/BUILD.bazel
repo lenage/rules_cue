@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_exported_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_exported_instance", "cue_instance")
 
 cue_instance(
     name = "cue_v1alpha1_instance",
@@ -7,7 +7,8 @@ cue_instance(
         "register_go_gen.cue",
         "types_go_gen.cue",
     ],
-    visibility = ["//visibility:__subpackages__"],
+    ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
+    visibility = ["//visibility:public"],
     deps = [
         "@io_k8s_api//core/v1:cue_v1_instance",
         "@io_k8s_apimachinery//pkg/api/resource:cue_resource_instance",
@@ -18,21 +19,10 @@ cue_instance(
 cue_exported_instance(
     name = "cue_v1alpha1_instance_exported",
     instance = "cue_v1alpha1_instance",
-    visibility = ["//visibility:__subpackages__"],
+    visibility = ["//visibility:public"],
     deps = [
         "@io_k8s_api//core/v1:cue_v1_instance",
         "@io_k8s_apimachinery//pkg/api/resource:cue_resource_instance",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:cue_v1_instance",
-    ],
-)
-
-cue_exported_files(
-    name = "cue_v1alpha1_exported_files",
-    module = "v1alpha1",
-    visibility = ["//visibility:__subpackages__"],
-    deps = [
-        "@io_k8s_api//core/v1:cue_v1_library",
-        "@io_k8s_apimachinery//pkg/api/resource:cue_resource_library",
-        "@io_k8s_apimachinery//pkg/apis/meta/v1:cue_v1_library",
     ],
 )
