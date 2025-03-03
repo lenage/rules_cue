@@ -17,10 +17,6 @@ cue_instance(
 
 cue_exported_instance(
     name = "cue_v1alpha1_instance_exported",
-    instance = "cue_v1alpha1_instance",
-    visibility = ["//visibility:public"],
-    deps = [
-        "@io_k8s_api//coordination/v1:cue_v1_instance",
-        "@io_k8s_apimachinery//pkg/apis/meta/v1:cue_v1_instance",
-    ],
+    instance = ":cue_v1alpha1_instance",
+    visibility = ["//visibility:__subpackages__"],
 )

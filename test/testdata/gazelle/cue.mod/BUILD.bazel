@@ -8,5 +8,5 @@ cue_module(
 cue_exported_standalone_files(
     name = "module_exported",
     srcs = ["module.cue"],
-    visibility = ["//visibility:public"],
+    visibility = ["//visibility:__subpackages__"],
 )

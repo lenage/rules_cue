@@ -399,17 +399,13 @@ func (cei *cueExportedInstance) ToRule() *rule.Rule {
 	if cei.Instance != "" {
 		r = rule.NewRule("cue_exported_instance", cei.Name)
 		r.SetAttr("instance", ":"+cei.Instance)
+		// r.SetAttr("path", []string{"extras:"})
+		// r.SetAttr("qualified_srcs", map[string]string{"extras": "yaml"})
 	} else {
 		r = rule.NewRule("cue_exported_standalone_files", cei.Name)
 		r.SetAttr("srcs", []string{cei.Src})
 	}
-	r.SetAttr("visibility", []string{"//visibility:public"})
-	var imprts []string
-	for imprt := range cei.Imports {
-		imprts = append(imprts, imprt)
-	}
-	sort.Strings(imprts)
-	r.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	r.SetAttr("visibility", []string{"//visibility:__subpackages__"})
 	return r
 }
 
