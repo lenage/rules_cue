@@ -43,21 +43,18 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	// Setup context for rule generation
 	ctx := &ruleGenerationContext{
-		config:              conf,
-		implicitPkgName:     path.Base(args.Rel),
-		baseImportPath:      computeImportPath(args),
-		isCueModDir:         path.Base(args.Dir) == "cue.mod",
-		moduleLabel:         findNearestCueModule(args.Dir, args.Rel),
-		libraries:           make(map[string]*cueLibrary),
-		exports:             make(map[string]*cueExport),
-		instances:           make(map[string]*cueInstance),
-		exportedFiles:       make(map[string]*cueExportedFiles),
-		enableTnargRulesCue: conf.enableTnargRulesCue,
-
-		// NOTE(yuan): do not generate exportedInstance by default
-		// exportedInstances: make(map[string]*cueExportedInstance),
-		// NOTE(yuan): do not generate consolidatedInstances by default
-		//consolidatedInstances: make(map[string]*cueConsolidatedInstance),
+		config:                conf,
+		implicitPkgName:       path.Base(args.Rel),
+		baseImportPath:        computeImportPath(args),
+		isCueModDir:           path.Base(args.Dir) == "cue.mod",
+		moduleLabel:           findNearestCueModule(args.Dir, args.Rel),
+		libraries:             make(map[string]*cueLibrary),
+		exports:               make(map[string]*cueExport),
+		instances:             make(map[string]*cueInstance),
+		enableTnargRulesCue:   conf.enableTnargRulesCue,
+		exportedFiles:         make(map[string]*cueExportedFiles),
+		exportedInstances:     make(map[string]*cueExportedInstance),
+		consolidatedInstances: make(map[string]*cueConsolidatedInstance),
 	}
 
 	// Process each CUE file
@@ -100,18 +97,21 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 // Context to hold all the data needed during rule generation
 type ruleGenerationContext struct {
-	config                *cueConfig
-	implicitPkgName       string
-	baseImportPath        string
-	isCueModDir           bool
-	moduleLabel           string
-	libraries             map[string]*cueLibrary
-	exports               map[string]*cueExport
-	instances             map[string]*cueInstance
-	exportedInstances     map[string]*cueExportedInstance
-	exportedFiles         map[string]*cueExportedFiles
-	consolidatedInstances map[string]*cueConsolidatedInstance
-	enableTnargRulesCue   bool
+	config                   *cueConfig
+	implicitPkgName          string
+	baseImportPath           string
+	isCueModDir              bool
+	moduleLabel              string
+	libraries                map[string]*cueLibrary
+	exports                  map[string]*cueExport
+	instances                map[string]*cueInstance
+	exportedInstances        map[string]*cueExportedInstance
+	exportedFiles            map[string]*cueExportedFiles
+	consolidatedInstances    map[string]*cueConsolidatedInstance
+	enableTnargRulesCue      bool
+	genExportedFiles         bool
+	genExportedInstances     bool
+	genConsolidatedInstances bool
 }
 
 // Parse all CUE files in the directory
@@ -160,21 +160,23 @@ func processStandaloneFile(ctx *ruleGenerationContext, fname string, imports []s
 		ctx.exports[tgt] = export
 	}
 
-	// Process exported files
-	exportedFilesName := fmt.Sprintf("%s_cue_exported_files", tgt)
-	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
-	if !ok {
-		exportedFile = &cueExportedFiles{
-			Name:         exportedFilesName,
-			Module:       ctx.moduleLabel,
-			Imports:      make(map[string]bool),
-			Srcs:         []string{fname},
-			OutputFormat: ctx.config.cueOutputFormat,
+	// if exportedFiles inited, then process exported files
+	if ctx.genExportedFiles {
+		exportedFilesName := fmt.Sprintf("%s_cue_exported_files", tgt)
+		exportedFile, ok := ctx.exportedFiles[exportedFilesName]
+		if !ok {
+			exportedFile = &cueExportedFiles{
+				Name:         exportedFilesName,
+				Module:       ctx.moduleLabel,
+				Imports:      make(map[string]bool),
+				Srcs:         []string{fname},
+				OutputFormat: ctx.config.cueOutputFormat,
+			}
+			ctx.exportedFiles[exportedFilesName] = exportedFile
 		}
-		ctx.exportedFiles[exportedFilesName] = exportedFile
-	}
-	for _, imprt := range imports {
-		exportedFile.Imports[imprt] = true
+		for _, imprt := range imports {
+			exportedFile.Imports[imprt] = true
+		}
 	}
 }
 
@@ -203,27 +205,29 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 	}
 
 	// Process exported files
-	exportedFilesName := fmt.Sprintf("%s_cue_exported_files", pkg)
-	exportedFile, ok := ctx.exportedFiles[exportedFilesName]
-	if !ok {
-		exportedFile = &cueExportedFiles{
-			Name:         exportedFilesName,
-			Module:       ctx.moduleLabel, //TODO(yuan): should be package or module label?
-			Imports:      make(map[string]bool),
-			OutputFormat: ctx.config.cueOutputFormat,
+	if ctx.genExportedFiles {
+		exportedFilesName := fmt.Sprintf("%s_cue_exported_files", pkg)
+		exportedFile, ok := ctx.exportedFiles[exportedFilesName]
+		if !ok {
+			exportedFile = &cueExportedFiles{
+				Name:         exportedFilesName,
+				Module:       ctx.moduleLabel, //TODO(yuan): should be package or module label?
+				Imports:      make(map[string]bool),
+				OutputFormat: ctx.config.cueOutputFormat,
+			}
+			ctx.exportedFiles[exportedFilesName] = exportedFile
 		}
-		ctx.exportedFiles[exportedFilesName] = exportedFile
+
+		for _, imprt := range imports {
+			exportedFile.Imports[imprt] = true
+		}
+
+		if len(instance.Srcs) > 0 {
+			exportedFile.Srcs = instance.Srcs
+		}
 	}
 
-	for _, imprt := range imports {
-		exportedFile.Imports[imprt] = true
-	}
-
-	if len(instance.Srcs) > 0 {
-		exportedFile.Srcs = instance.Srcs
-	}
-
-	if ctx.consolidatedInstances != nil {
+	if ctx.genConsolidatedInstances {
 		// Process consolidated instance
 		consolidatedName := fmt.Sprintf("cue_%s_consolidated", pkg)
 		consolidated, ok := ctx.consolidatedInstances[consolidatedName]
@@ -298,7 +302,7 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 	for _, instance := range ctx.instances {
 		rules = append(rules, instance.ToRule())
 
-		if ctx.exportedInstances != nil {
+		if ctx.genExportedInstances {
 			// Create a cue_exported_instance rule for each instance
 			exportedInstanceName := instance.Name + "_exported"
 			exportedInstance := &cueExportedInstance{
@@ -393,13 +397,19 @@ func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[s
 				empty = append(empty, rule.NewRule("cue_instance", r.Name()))
 			}
 		case "cue_exported_instance", "cue_exported_standalone_files":
-			if _, ok := exportedInstances[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule(r.Kind(), r.Name()))
+			// only check exported instance if enable
+			if len(exportedInstances) > 0 {
+				if _, ok := exportedInstances[r.Name()]; !ok {
+					empty = append(empty, rule.NewRule(r.Kind(), r.Name()))
+				}
 			}
 		case "cue_exported_files":
-			if _, ok := exportedFiles[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule("cue_exported_files", r.Name()))
+			if len(exportedFiles) > 0 {
+				if _, ok := exportedFiles[r.Name()]; !ok {
+					empty = append(empty, rule.NewRule("cue_exported_files", r.Name()))
+				}
 			}
+
 		case "cue_module":
 			if !isCueModDir {
 				empty = append(empty, rule.NewRule("cue_module", r.Name()))
