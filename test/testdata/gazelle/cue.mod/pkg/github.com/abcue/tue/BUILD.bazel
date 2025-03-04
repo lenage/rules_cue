@@ -1,10 +1,10 @@
 load("@rules_cue//cue:cue.bzl", "cue_instance")
 
 cue_instance(
-    name = "cue_tue_instance",
+    name = "tue_cue_instance",
     package_name = "tue",
     srcs = ["tue.cue"],
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:public"],
-    deps = ["//test/testdata/gazelle/cue.mod/pkg/github.com/abcue/tool:cue_tool_instance"],
+    deps = ["//test/testdata/gazelle/cue.mod/pkg/github.com/abcue/tool:tool_cue_instance"],
 )

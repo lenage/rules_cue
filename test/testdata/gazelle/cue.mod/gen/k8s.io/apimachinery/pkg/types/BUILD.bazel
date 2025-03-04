@@ -1,7 +1,7 @@
 load("@rules_cue//cue:cue.bzl", "cue_instance")
 
 cue_instance(
-    name = "cue_types_instance",
+    name = "types_cue_instance",
     package_name = "types",
     srcs = [
         "doc_go_gen.cue",
