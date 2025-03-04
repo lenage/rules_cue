@@ -221,13 +221,5 @@ func (cl *cueLang) Loads() []rule.LoadInfo {
 // is called before the file is indexed. Unless c.ShouldFix is true,
 // fixes that delete or rename rules should not be performed.
 func (s *cueLang) Fix(c *config.Config, f *rule.File) {
-	// Remove cue_library rules as they are deprecated
-	for i := 0; i < len(f.Rules); i++ {
-		if f.Rules[i].Kind() == "cue_library" {
-			if c.ShouldFix {
-				f.Rules = append(f.Rules[:i], f.Rules[i+1:]...)
-				i--
-			}
-		}
-	}
+	// currently noop
 }
