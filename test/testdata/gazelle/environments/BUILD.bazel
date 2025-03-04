@@ -6,7 +6,7 @@ cue_exported_files(
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
-    deps = ["//test/testdata/gazelle:cue_gazelle_instance"],
+    deps = ["//test/testdata/gazelle:gazelle_cue_instance"],
 )
 
 cue_exported_files(
@@ -15,5 +15,5 @@ cue_exported_files(
     module = "//test/testdata/gazelle/cue.mod:cue.mod",
     output_format = "json",
     visibility = ["//visibility:public"],
-    deps = ["//test/testdata/gazelle:cue_gazelle_instance"],
+    deps = ["//test/testdata/gazelle:gazelle_cue_instance"],
 )

@@ -188,7 +188,7 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 	}
 
 	// Process instance
-	instanceTgt := fmt.Sprintf("cue_%s_instance", pkg)
+	instanceTgt := fmt.Sprintf("%s_cue_instance", pkg)
 	instance, ok := ctx.instances[instanceTgt]
 	if !ok {
 		instance = &cueInstance{
@@ -229,7 +229,7 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 
 	if ctx.genConsolidatedInstances {
 		// Process consolidated instance
-		consolidatedName := fmt.Sprintf("cue_%s_consolidated", pkg)
+		consolidatedName := fmt.Sprintf("%s_cue_consolidated", pkg)
 		consolidated, ok := ctx.consolidatedInstances[consolidatedName]
 		if !ok {
 			consolidated = &cueConsolidatedInstance{

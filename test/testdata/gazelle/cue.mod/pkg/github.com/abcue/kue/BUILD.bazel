@@ -1,7 +1,7 @@
 load("@rules_cue//cue:cue.bzl", "cue_instance")
 
 cue_instance(
-    name = "cue_kue_instance",
+    name = "kue_cue_instance",
     package_name = "kue",
     srcs = ["kue.cue"],
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",

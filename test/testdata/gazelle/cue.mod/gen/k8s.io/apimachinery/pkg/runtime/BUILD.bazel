@@ -1,7 +1,7 @@
 load("@rules_cue//cue:cue.bzl", "cue_instance")
 
 cue_instance(
-    name = "cue_runtime_instance",
+    name = "runtime_cue_instance",
     package_name = "runtime",
     srcs = [
         "allocator_go_gen.cue",

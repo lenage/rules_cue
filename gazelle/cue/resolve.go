@@ -110,7 +110,7 @@ func indexCueModuleDir(moduleInfo *CueModuleInfo, subdir, dirPath string) {
 				}
 
 				// Create target labels for both instance and library with module path prefix
-				instanceTarget := fmt.Sprintf("%s/%s/%s:cue_%s_instance", modulePath, subdir, importPath, pkgName)
+				instanceTarget := fmt.Sprintf("%s/%s/%s:%s_cue_instance", modulePath, subdir, importPath, pkgName)
 
 				// Add to index with full import path
 				cueModIndex[moduleInfo][importPath] = instanceTarget
@@ -306,7 +306,7 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 						cuePkg = base
 					}
 
-					instanceLabel := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("cue_%s_instance", cuePkg))
+					instanceLabel := label.New(repo, path.Join(path.Dir(pkg), baseParts[0]), fmt.Sprintf("%s_cue_instance", cuePkg))
 
 					// Prefer cue_instance if we're using the new rules
 					// Check if the rule kind is one that should use instance labels
