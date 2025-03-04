@@ -1,17 +1,9 @@
-load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_instance")
 
 cue_instance(
     name = "cue_intstr_instance",
     package_name = "intstr",
     srcs = ["intstr_go_gen.cue"],
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
-    visibility = ["//visibility:public"],
-)
-
-cue_exported_files(
-    name = "intstr_cue_exported_files",
-    srcs = ["intstr_go_gen.cue"],
-    module = "//test/testdata/gazelle/cue.mod:cue.mod",
-    output_format = "json",
     visibility = ["//visibility:public"],
 )
