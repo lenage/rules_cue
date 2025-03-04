@@ -204,16 +204,6 @@ func (cl *cueLang) Loads() []rule.LoadInfo {
 				"cue_register_toolchains",
 			},
 		},
-		// Add the new aliases file
-		{
-			Name: "@rules_cue//cue:aliases.bzl",
-			Symbols: []string{
-				"cue_export",
-			},
-			After: []string{
-				"cue_register_toolchains",
-			},
-		},
 	}
 }
 
