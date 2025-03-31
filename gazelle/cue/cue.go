@@ -210,17 +210,17 @@ func (cl *cueLang) Loads() []rule.LoadInfo {
 // Fix repairs deprecated usage of language-specific rules in f. This
 // is called before the file is indexed. Unless c.ShouldFix is true,
 // fixes that delete or rename rules should not be performed.
-func (s *cueLang) Fix(c *config.Config, f *rule.File) {
+func (cl *cueLang) Fix(c *config.Config, f *rule.File) {
 	// Remove cue_library rules if ShouldFix is true
+	fmt.Println("CUE Fix method called with ShouldFix =", c.ShouldFix)
 	if c.ShouldFix {
-		for i := range f.Rules {
-			if i >= len(f.Rules) {
-				break
-			}
-			if f.Rules[i].Kind() == "cue_library" {
-				f.Rules = append(f.Rules[:i], f.Rules[i+1:]...)
-				i--
+		var newRules []*rule.Rule
+
+		for _, r := range f.Rules {
+			if r.Kind() != "cue_library" {
+				newRules = append(newRules, r)
 			}
 		}
+		f.Rules = newRules
 	}
 }
