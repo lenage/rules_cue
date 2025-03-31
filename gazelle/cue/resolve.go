@@ -38,7 +38,7 @@ var (
 func init() {
 	cueModules = make(map[string]*CueModuleInfo)
 	cueModIndex = make(map[*CueModuleInfo]map[string]string)
-	debugModIndex = true
+	debugModIndex = false
 }
 
 // RegisterCueModule registers a cue_module for later use in resolution
