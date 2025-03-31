@@ -156,10 +156,20 @@ func (cl *cueLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 	conf := GetConfig(c)
 	switch r.Kind() {
 	case "cue_library":
+		// Only index cue_library rules if tnarg_rules_cue is enabled
+		if !conf.enableTnargRulesCue {
+			return nil
+		}
+
+		importPath := r.AttrString("importpath")
+		if importPath == "" {
+			return nil
+		}
+
 		return []resolve.ImportSpec{
 			{
 				Lang: cueName,
-				Imp:  r.AttrString("importpath"),
+				Imp:  importPath,
 			},
 		}
 	case "cue_instance":
@@ -231,13 +241,13 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 		cueModule = r.AttrString("module")
 	}
 
-	if debugModIndex {
-		log.Printf("DEBUG: kind: %s, cueModule: %s\n", r.Kind(), cueModule)
-	}
-
 	for _, imp := range imps {
 		if _, ok := stdlib[imp]; ok {
 			continue
+		}
+
+		if debugModIndex {
+			log.Printf("DEBUG Resolve:  kind: %s, cueModule: %s, import_path: %s\n", r.Kind(), cueModule, imp)
 		}
 
 		// 1. Check cueModelIndex
