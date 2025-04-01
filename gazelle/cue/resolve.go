@@ -225,14 +225,37 @@ func (cl *cueLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 			},
 		}
 	case "cue_instance":
-		// For cue_instance, we use the package_name attribute as the import path
 		if pkgName := r.AttrString("package_name"); pkgName != "" {
-			// Get the configuration to access the prefix
-			importPath := pkgName
+			// Get the file package path from the context
+			filePkg := f.Pkg
 
-			// If we have a prefix, use it to form a fully qualified import path
-			if conf.prefix != "" && !strings.Contains(pkgName, "/") {
-				importPath = path.Join(conf.prefix, pkgName)
+			var importPath string
+			if conf.prefix != "" {
+				// If we have a prefix, trim the prefixRel from f.Pkg
+				relativePath := filePkg
+				if strings.HasPrefix(filePkg, conf.prefixRel) {
+					relativePath = strings.TrimPrefix(filePkg, conf.prefixRel)
+					// Remove leading slash if present
+					relativePath = strings.TrimPrefix(relativePath, "/")
+				}
+
+				// Join the prefix with the relative path
+				if pkgName == path.Base(relativePath) {
+					// When pkgName matches the last component of the path
+					// Use the pattern: prefix + relativePath
+					importPath = path.Join(conf.prefix, relativePath)
+				} else {
+					// Otherwise append the pkgName
+					// Use the pattern: prefix + relativePath + ":" + pkgName
+					importPath = path.Join(conf.prefix, relativePath) + ":" + pkgName
+				}
+			} else {
+				// If no prefix, just use the file package path + pkgName
+				if pkgName == path.Base(filePkg) {
+					importPath = filePkg
+				} else {
+					importPath = filePkg + ":" + pkgName
+				}
 			}
 
 			// Create the primary import spec
@@ -242,34 +265,19 @@ func (cl *cueLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 					Imp:  importPath,
 				},
 			}
+			// Add a non-colon version if the import path contains a colon
+			if strings.Contains(importPath, ":") {
+				// Extract the path part without the colon and package name
+				pathPart := importPath[:strings.LastIndex(importPath, ":")]
 
-			// Additionally create a colon-style import spec
-			// This enables other rules to import this instance with a colon
-			parts := strings.Split(importPath, "/")
-			if len(parts) > 0 {
-				lastPart := parts[len(parts)-1]
-
-				// If the last part isn't the package name itself, create a colon import
-				if lastPart != pkgName {
-					basePath := strings.TrimSuffix(importPath, "/"+lastPart)
-					colonImport := fmt.Sprintf("%s:%s", basePath, pkgName)
-
+				// Only add if it's different from the original import path
+				if pathPart != importPath {
 					specs = append(specs, resolve.ImportSpec{
 						Lang: cueName,
-						Imp:  colonImport,
-					})
-				}
-
-				// Also handle the full path with colon
-				colonFullImport := fmt.Sprintf("%s:%s", importPath, pkgName)
-				if colonFullImport != importPath {
-					specs = append(specs, resolve.ImportSpec{
-						Lang: cueName,
-						Imp:  colonFullImport,
+						Imp:  pathPart,
 					})
 				}
 			}
-
 			return specs
 		}
 	case "cue_module":

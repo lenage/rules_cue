@@ -212,10 +212,8 @@ func (cl *cueLang) Loads() []rule.LoadInfo {
 // fixes that delete or rename rules should not be performed.
 func (cl *cueLang) Fix(c *config.Config, f *rule.File) {
 	// Remove cue_library rules if ShouldFix is true
-	fmt.Println("CUE Fix method called with ShouldFix =", c.ShouldFix)
 	if c.ShouldFix {
 		var newRules []*rule.Rule
-
 		for _, r := range f.Rules {
 			if r.Kind() != "cue_library" {
 				newRules = append(newRules, r)
