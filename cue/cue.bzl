@@ -778,6 +778,8 @@ def cue_consolidated_instance(name, **kwargs):
         **kwargs
     )
 
+cue_def = cue_consolidated_instance
+
 def _augment_exported_output_args(ctx, args):
     if ctx.attr.escape:
         args.add("--escape")
@@ -884,6 +886,8 @@ def cue_exported_instance(name, **kwargs):
         ],
         **kwargs
     )
+
+cue_export = cue_exported_instance
 
 def cue_test(name, generated_output_file, golden_file = None):
     """Creates a test that compares a generated CUE output file against a golden file.

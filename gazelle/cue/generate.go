@@ -43,18 +43,19 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	// Setup context for rule generation
 	ctx := &ruleGenerationContext{
-		config:                conf,
-		implicitPkgName:       path.Base(args.Rel),
-		baseImportPath:        computeImportPath(args),
-		isCueModDir:           path.Base(args.Dir) == "cue.mod",
-		moduleLabel:           findNearestCueModule(args.Dir, args.Rel),
-		libraries:             make(map[string]*cueLibrary),
-		exports:               make(map[string]*cueExport),
-		instances:             make(map[string]*cueInstance),
-		enableTnargRulesCue:   conf.enableTnargRulesCue,
-		exportedFiles:         make(map[string]*cueExportedFiles),
-		exportedInstances:     make(map[string]*cueExportedInstance),
-		consolidatedInstances: make(map[string]*cueConsolidatedInstance),
+		config:                   conf,
+		implicitPkgName:          path.Base(args.Rel),
+		baseImportPath:           computeImportPath(args),
+		isCueModDir:              path.Base(args.Dir) == "cue.mod",
+		moduleLabel:              findNearestCueModule(args.Dir, args.Rel),
+		libraries:                make(map[string]*cueLibrary),
+		exports:                  make(map[string]*cueExport),
+		instances:                make(map[string]*cueInstance),
+		enableTnargRulesCue:      conf.enableTnargRulesCue,
+		exportedFiles:            make(map[string]*cueExportedFiles),
+		exportedInstances:        make(map[string]*cueExportedInstance),
+		consolidatedInstances:    make(map[string]*cueConsolidatedInstance),
+		genConsolidatedInstances: true,
 	}
 
 	// Process each CUE file
@@ -90,7 +91,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	// Generate empty rules
 	res.Empty = generateEmpty(args.File, ctx.libraries, ctx.exports, ctx.instances,
-		ctx.exportedInstances, ctx.exportedFiles, ctx.enableTnargRulesCue, ctx.isCueModDir)
+		ctx.exportedInstances, ctx.exportedFiles, ctx.isCueModDir)
 
 	return res
 }
@@ -372,7 +373,7 @@ func exportName(basename string) string {
 
 func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[string]*cueExport,
 	instances map[string]*cueInstance, exportedInstances map[string]*cueExportedInstance,
-	exportedFiles map[string]*cueExportedFiles, enableTnargRulesCue bool, isCueModDir bool) []*rule.Rule {
+	exportedFiles map[string]*cueExportedFiles, isCueModDir bool) []*rule.Rule {
 	if f == nil {
 		return nil
 	}
@@ -380,16 +381,13 @@ func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[s
 	for _, r := range f.Rules {
 		switch r.Kind() {
 		case "cue_library", "cue_export":
-			// Only check these rules if tnarg_rules_cue is enabled
-			if enableTnargRulesCue {
-				if r.Kind() == "cue_library" {
-					if _, ok := libraries[r.Name()]; !ok {
-						empty = append(empty, rule.NewRule("cue_library", r.Name()))
-					}
-				} else { // cue_export
-					if _, ok := exports[r.Name()]; !ok {
-						empty = append(empty, rule.NewRule("cue_export", r.Name()))
-					}
+			if r.Kind() == "cue_library" {
+				if _, ok := libraries[r.Name()]; !ok {
+					empty = append(empty, rule.NewRule("cue_library", r.Name()))
+				}
+			} else { // cue_export
+				if _, ok := exports[r.Name()]; !ok {
+					empty = append(empty, rule.NewRule("cue_export", r.Name()))
 				}
 			}
 		case "cue_instance":
