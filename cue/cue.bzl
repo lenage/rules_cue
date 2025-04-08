@@ -579,6 +579,12 @@ def _make_instance_consuming_action(ctx, cue_subcommand, mnemonic, description, 
     else:
         relative_instance_path = "./" + relative_instance_path
 
+    prefixes = ["./cue.mod/pkg/", "./cue.mod/usr/", "./cue.mod/gen/"]
+    for prefix in prefixes:
+        if relative_instance_path.startswith(prefix):
+            relative_instance_path = relative_instance_path[len(prefix):]
+            break
+
     _make_output_producing_action(
         ctx,
         cue_subcommand,

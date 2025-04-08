@@ -1,6 +1,6 @@
 #gazelle:prefix example.com
 
-load("@rules_cue//cue:cue.bzl", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_consolidated_instance", "cue_instance")
 
 cue_instance(
     name = "gazelle_cue_instance",
@@ -9,4 +9,11 @@ cue_instance(
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:public"],
     deps = ["//test/testdata/gazelle/cue.mod/gen/k8s.io/api/apps/v1:v1_cue_instance"],
+)
+
+cue_consolidated_instance(
+    name = "gazelle_cue_def",
+    instance = ":gazelle_cue_instance",
+    output_format = "cue",
+    visibility = ["//visibility:public"],
 )

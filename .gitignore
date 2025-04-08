@@ -5,3 +5,4 @@ bazel-rules_cue
 bazel-testlogs
 *~
 .bazelrc.*
+*.log
