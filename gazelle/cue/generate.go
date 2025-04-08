@@ -230,7 +230,7 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 
 	if ctx.genConsolidatedInstances {
 		// Process consolidated instance
-		consolidatedName := fmt.Sprintf("%s_cue_consolidated", pkg)
+		consolidatedName := fmt.Sprintf("%s_cue_def", pkg)
 		consolidated, ok := ctx.consolidatedInstances[consolidatedName]
 		if !ok {
 			consolidated = &cueConsolidatedInstance{
@@ -610,11 +610,12 @@ func (cci *cueConsolidatedInstance) ToRule() *rule.Rule {
 	// Always set output_format to "cue" for consolidated instances
 	r.SetAttr("output_format", "cue")
 
-	var imprts []string
-	for imprt := range cci.Imports {
-		imprts = append(imprts, imprt)
-	}
-	sort.Strings(imprts)
-	r.SetPrivateAttr(config.GazelleImportsKey, imprts)
+	// NOTE(yuanh): do not set deps for cue_consolidated_instance
+	// var imprts []string
+	// for imprt := range cci.Imports {
+	// 	imprts = append(imprts, imprt)
+	// }
+	// sort.Strings(imprts)
+	// r.SetPrivateAttr(config.GazelleImportsKey, imprts)
 	return r
 }

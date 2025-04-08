@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_consolidated_instance", "cue_instance")
 
 cue_instance(
     name = "types_cue_instance",
@@ -11,5 +11,12 @@ cue_instance(
         "uid_go_gen.cue",
     ],
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
+    visibility = ["//visibility:public"],
+)
+
+cue_consolidated_instance(
+    name = "types_cue_def",
+    instance = ":types_cue_instance",
+    output_format = "cue",
     visibility = ["//visibility:public"],
 )

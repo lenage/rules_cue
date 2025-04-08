@@ -107,7 +107,6 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			NonEmptyAttrs: map[string]bool{
 				"instance": true,
 			},
-			ResolveAttrs: map[string]bool{"deps": true},
 		},
 		// cue_consolidated_files: Consolidates CUE files that are part of a module into a single output file in a specified format.
 		"cue_consolidated_files": {
@@ -118,7 +117,6 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 				"output_format": false,
 				"result":        true,
 			},
-			ResolveAttrs: map[string]bool{"deps": true},
 		},
 		//cue_consolidated_standalone_files: Processes standalone CUE files (not part of a module) and outputs a consolidated definition in a specified format.
 		"cue_consolidated_standalone_files": {

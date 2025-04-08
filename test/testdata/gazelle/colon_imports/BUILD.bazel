@@ -1,3 +1,4 @@
+load("@rules_cue//cue:cue.bzl", "cue_consolidated_instance")
 load("//cue:cue.bzl", "cue_instance")
 
 cue_instance(
@@ -7,4 +8,11 @@ cue_instance(
     ancestor = "//test/testdata/gazelle/cue.mod:cue.mod",
     visibility = ["//visibility:public"],
     deps = ["//test/testdata/gazelle/cue.mod/pkg/github.com/abcue/tool:tool_cue_instance"],
+)
+
+cue_consolidated_instance(
+    name = "colon_imports_cue_def",
+    instance = ":colon_imports_cue_instance",
+    output_format = "cue",
+    visibility = ["//visibility:public"],
 )
