@@ -35,12 +35,13 @@ cue_cmd = rule(
             mandatory = False,
             default = "",
         ),
-        # Command to run with cue cmd {command}. This is an alias for 'tool'.
-        "command": attr.string(
-            mandatory = False,
-        ),
         # Command to run with cue cmd {command}. assign it to TOOL
         # keep name 'command' for backward compatibility
+        # DEPRECATED: Use 'tool' instead of 'command'
+        "command": attr.string(
+            mandatory = False,
+            deprecated = "Use 'tool' instead of 'command'",
+        ),
         "tool": attr.string(
             mandatory = False,
         ),
