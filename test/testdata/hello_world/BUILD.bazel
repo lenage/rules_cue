@@ -10,7 +10,6 @@ exports_files([
     "message-golden.txt",
     "de-golden.json",
     "en-golden.json",
-    "hello_world_cmd-golden.out",
 ])
 
 _MODULE = "//test/testdata/hello_world/cue.mod"
