@@ -1,5 +1,6 @@
 #gazelle:prefix example.com
 
+load("@rules_cue//cue:cmd.bzl", "cue_cmd")
 load("@rules_cue//cue:cue.bzl", "cue_consolidated_instance", "cue_instance")
 
 cue_instance(
@@ -15,5 +16,11 @@ cue_consolidated_instance(
     name = "gazelle_cue_def",
     instance = ":gazelle_cue_instance",
     output_format = "cue",
+    visibility = ["//visibility:public"],
+)
+
+cue_cmd(
+    name = "cue_cmd",
+    cmd = "",
     visibility = ["//visibility:public"],
 )
