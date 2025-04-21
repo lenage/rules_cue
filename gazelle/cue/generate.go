@@ -90,8 +90,8 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 	}
 
 	// Generate empty rules
-	res.Empty = generateEmpty(args.File, ctx.libraries, ctx.exports, ctx.instances,
-		ctx.exportedInstances, ctx.exportedFiles, ctx.isCueModDir)
+	res.Empty = generateEmpty(args.File, ctx.isCueModDir, ctx.instances,
+		ctx.exportedInstances, ctx.exportedFiles, ctx.consolidatedInstances)
 
 	return res
 }
@@ -371,50 +371,66 @@ func exportName(basename string) string {
 	return strcase.ToSnake(strings.Join(parts[:len(parts)-1], "_"))
 }
 
-func generateEmpty(f *rule.File, libraries map[string]*cueLibrary, exports map[string]*cueExport,
-	instances map[string]*cueInstance, exportedInstances map[string]*cueExportedInstance,
-	exportedFiles map[string]*cueExportedFiles, isCueModDir bool) []*rule.Rule {
+func generateEmpty(
+	f *rule.File,
+	isCueModDir bool,
+	instances map[string]*cueInstance,
+	exportedInstances map[string]*cueExportedInstance,
+	exportedFiles map[string]*cueExportedFiles,
+	consolidatedInstances map[string]*cueConsolidatedInstance,
+) []*rule.Rule {
 	if f == nil {
 		return nil
 	}
+
 	var empty []*rule.Rule
+
+	// Helper function to check if a rule should be marked as empty
+	checkAndMarkEmpty := func(kind, name string, exists bool) {
+		if !exists {
+			empty = append(empty, rule.NewRule(kind, name))
+		}
+	}
+
 	for _, r := range f.Rules {
-		switch r.Kind() {
+		kind := r.Kind()
+		name := r.Name()
+
+		switch kind {
 		case "cue_library", "cue_export":
-			if r.Kind() == "cue_library" {
-				if _, ok := libraries[r.Name()]; !ok {
-					empty = append(empty, rule.NewRule("cue_library", r.Name()))
-				}
-			} else { // cue_export
-				if _, ok := exports[r.Name()]; !ok {
-					empty = append(empty, rule.NewRule("cue_export", r.Name()))
-				}
-			}
+			// NOTE: mark all cue_library and cue_export as empty
+			// since cue_library is depreacted
+			checkAndMarkEmpty(kind, name, true)
 		case "cue_instance":
-			if _, ok := instances[r.Name()]; !ok {
-				empty = append(empty, rule.NewRule("cue_instance", r.Name()))
+			_, exists := instances[name]
+			checkAndMarkEmpty(kind, name, exists)
+
+		case "cue_consolidated_instance":
+			if len(consolidatedInstances) > 0 {
+				_, exists := consolidatedInstances[name]
+				checkAndMarkEmpty(kind, name, exists)
 			}
+
 		case "cue_exported_instance", "cue_exported_standalone_files":
-			// only check exported instance if enable
 			if len(exportedInstances) > 0 {
-				if _, ok := exportedInstances[r.Name()]; !ok {
-					empty = append(empty, rule.NewRule(r.Kind(), r.Name()))
-				}
+				_, exists := exportedInstances[name]
+				checkAndMarkEmpty(kind, name, exists)
 			}
+
 		case "cue_exported_files":
 			if len(exportedFiles) > 0 {
-				if _, ok := exportedFiles[r.Name()]; !ok {
-					empty = append(empty, rule.NewRule("cue_exported_files", r.Name()))
-				}
+				_, exists := exportedFiles[name]
+				checkAndMarkEmpty(kind, name, exists)
 			}
 
 		case "cue_module":
 			if !isCueModDir {
-				empty = append(empty, rule.NewRule("cue_module", r.Name()))
+				checkAndMarkEmpty(kind, name, false)
 			}
 		}
 		// Don't mark other rule types as empty
 	}
+
 	return empty
 }
 
@@ -465,6 +481,7 @@ type cueInstance struct {
 	PackageName string
 	Srcs        []string
 	Imports     map[string]bool
+	Ancestor    string
 	Module      string // Reference to the nearest cue_module
 }
 
@@ -475,10 +492,13 @@ func (ci *cueInstance) ToRule() *rule.Rule {
 	rule.SetAttr("package_name", ci.PackageName)
 	rule.SetAttr("visibility", []string{"//visibility:public"})
 
-	// Set module attribute if a cue_module was found
-	if ci.Module != "" {
+	switch {
+	case ci.Ancestor != "":
+		rule.SetAttr("ancestor", ci.Ancestor)
+	case ci.Module != "":
 		rule.SetAttr("ancestor", ci.Module)
 	}
+
 	var deps []string
 	for dep := range ci.Imports {
 		deps = append(deps, dep)
