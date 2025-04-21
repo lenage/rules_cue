@@ -60,8 +60,8 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	// Process each CUE file
 	for fname, cueFile := range cueFiles {
-		pkg := cueFile.PackageName()
-		imports := extractImports(cueFile)
+		pkg := cueFile.ast.PackageName()
+		imports := extractImports(cueFile.ast)
 
 		if pkg == "" {
 			processStandaloneFile(ctx, fname, imports)
@@ -115,9 +115,16 @@ type ruleGenerationContext struct {
 	genConsolidatedInstances bool
 }
 
+// cueFile represents a CUE file with its AST and path information
+type cueFile struct {
+	ast *ast.File
+	rel string
+	pth string
+}
+
 // Parse all CUE files in the directory
-func parseCueFiles(args language.GenerateArgs) map[string]*ast.File {
-	cueFiles := make(map[string]*ast.File)
+func parseCueFiles(args language.GenerateArgs) map[string]*cueFile {
+	cueFiles := make(map[string]*cueFile)
 	for _, f := range append(args.RegularFiles, args.GenFiles...) {
 		// Only generate Cue entries for cue files (.cue)
 		if !strings.HasSuffix(f, ".cue") {
@@ -125,12 +132,17 @@ func parseCueFiles(args language.GenerateArgs) map[string]*ast.File {
 		}
 
 		pth := filepath.Join(args.Dir, f)
-		cueFile, err := parser.ParseFile(pth, nil)
+		a, err := parser.ParseFile(pth, nil)
 		if err != nil {
 			log.Printf("parsing cue file: path=%q, err=%+v", pth, err)
 			continue
 		}
-		cueFiles[f] = cueFile
+
+		cueFiles[f] = &cueFile{
+			ast: a,
+			rel: args.Rel,
+			pth: pth,
+		}
 	}
 	return cueFiles
 }
@@ -191,6 +203,7 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 	// Process instance
 	instanceTgt := fmt.Sprintf("%s_cue_instance", pkg)
 	instance, ok := ctx.instances[instanceTgt]
+
 	if !ok {
 		instance = &cueInstance{
 			Name:        instanceTgt,
@@ -198,8 +211,10 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 			Imports:     make(map[string]bool),
 			Module:      ctx.moduleLabel,
 		}
+		// find parent instance with prefix
 		ctx.instances[instanceTgt] = instance
 	}
+
 	instance.Srcs = append(instance.Srcs, fname)
 	for _, imprt := range imports {
 		instance.Imports[imprt] = true
@@ -629,13 +644,5 @@ func (cci *cueConsolidatedInstance) ToRule() *rule.Rule {
 
 	// Always set output_format to "cue" for consolidated instances
 	r.SetAttr("output_format", "cue")
-
-	// NOTE(yuanh): do not set deps for cue_consolidated_instance
-	// var imprts []string
-	// for imprt := range cci.Imports {
-	// 	imprts = append(imprts, imprt)
-	// }
-	// sort.Strings(imprts)
-	// r.SetPrivateAttr(config.GazelleImportsKey, imprts)
 	return r
 }
