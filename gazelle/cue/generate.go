@@ -41,6 +41,13 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		return language.GenerateResult{}
 	}
 
+	// list cue_test golden files
+	cueTestGoldenfiles, err := listGoldenFiles(args, conf.cueTestGoldenSuffix)
+	if err != nil {
+		log.Printf("error listing golden files: %v", err)
+	}
+	// Match golden files with their corresponding CUE files
+
 	// Setup context for rule generation
 	ctx := &ruleGenerationContext{
 		config:                   conf,
@@ -56,12 +63,21 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		exportedInstances:        make(map[string]*cueExportedInstance),
 		consolidatedInstances:    make(map[string]*cueConsolidatedInstance),
 		genConsolidatedInstances: true,
+		genExportedInstances:     conf.cueGenExportedInstance,
 	}
 
 	// Process each CUE file
 	for fname, cueFile := range cueFiles {
 		pkg := cueFile.ast.PackageName()
 		imports := extractImports(cueFile.ast)
+
+		if conf.cueTestGoldenSuffix != "" {
+			var goldenfile string
+			if _, found := cueTestGoldenfiles[cueFile.rel]; found {
+				goldenfile = cueTestGoldenfiles[cueFile.rel].name
+			}
+			log.Println("cue_test golden file: ", goldenfile)
+		}
 
 		if pkg == "" {
 			processStandaloneFile(ctx, fname, imports)
@@ -116,6 +132,40 @@ type ruleGenerationContext struct {
 }
 
 // cueFile represents a CUE file with its AST and path information
+
+// GoldenFile represents a golden file used in CUE tests
+type GoldenFile struct {
+	path string
+	rel  string
+	name string
+}
+
+// ListGoldenFiles finds all golden files in the given directory that match the configured suffix
+// Returns a map of base name (without suffix) to GoldenFile
+func listGoldenFiles(args language.GenerateArgs, goldenSuffix string) (map[string]*GoldenFile /*key: pth*/, error) {
+	result := make(map[string]*GoldenFile)
+	if goldenSuffix == "" {
+		return result, nil
+	}
+
+	for _, f := range args.RegularFiles {
+		if !strings.HasSuffix(f, goldenSuffix) {
+			continue
+		}
+		// Extract base name without the golden suffix
+		pth := filepath.Join(args.Dir, f)
+		rel := args.Rel
+		//NOTE(yuan): only supports one golden file per directory
+		result[rel] = &GoldenFile{
+			path: pth,
+			rel:  rel,
+			name: f,
+		}
+	}
+
+	return result, nil
+}
+
 type cueFile struct {
 	ast *ast.File
 	rel string
@@ -644,5 +694,22 @@ func (cci *cueConsolidatedInstance) ToRule() *rule.Rule {
 
 	// Always set output_format to "cue" for consolidated instances
 	r.SetAttr("output_format", "cue")
+	return r
+}
+
+// cueTest represents a CUE test rule that can be used to validate CUE code
+// against expected outputs (golden files). It allows for testing CUE configurations
+// and ensuring they produce the expected results when evaluated.
+type cueTest struct {
+	Name                string
+	GoldenFile          string
+	GeneratedOutputFile string
+}
+
+func (ct *cueTest) ToRule() *rule.Rule {
+	var r *rule.Rule
+	//TODO(yuan): will create rules as below
+	// 1. cue_test
+	// 2. export_files([%{GoldenFile}])
 	return r
 }
