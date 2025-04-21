@@ -40,7 +40,7 @@ cue_cmd = rule(
         # DEPRECATED: Use 'tool' instead of 'command'
         "command": attr.string(
             mandatory = False,
-            deprecated = "Use 'tool' instead of 'command'",
+            doc = "DEPRECATED: Use 'tool' instead of 'command'",
         ),
         "tool": attr.string(
             mandatory = False,
