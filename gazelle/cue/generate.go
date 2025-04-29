@@ -75,8 +75,6 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 		if conf.cueTestGoldenSuffix != "" {
 			if gd, found := cueTestGoldenfiles[cueFile.rel]; found {
-				log.Println("-0000----")
-				log.Println(gd.name)
 				ctx.exportedGoldenFiles[gd.name] = gd
 			}
 		}
@@ -371,8 +369,6 @@ func genCueTestRule(ctx *ruleGenerationContext, tgt string, exportedFilesName st
 			return
 		}
 	}
-
-	log.Println(goldenFileName)
 
 	if !strings.HasSuffix(goldenFileName, "."+ctx.config.cueOutputFormat) {
 		// If the golden file doesn't have the correct output format extension,
