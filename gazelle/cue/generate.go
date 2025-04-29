@@ -62,6 +62,8 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		exportedFiles:            make(map[string]*cueExportedFiles),
 		exportedInstances:        make(map[string]*cueExportedInstance),
 		consolidatedInstances:    make(map[string]*cueConsolidatedInstance),
+		exportedGoldenFiles:      make(map[string]*GoldenFile),
+		cueTestRules:             make(map[string]*cueTest),
 		genConsolidatedInstances: true,
 		genExportedInstances:     conf.cueGenExportedInstance,
 	}
@@ -72,11 +74,11 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		imports := extractImports(cueFile.ast)
 
 		if conf.cueTestGoldenSuffix != "" {
-			var goldenfile string
-			if _, found := cueTestGoldenfiles[cueFile.rel]; found {
-				goldenfile = cueTestGoldenfiles[cueFile.rel].name
+			if gd, found := cueTestGoldenfiles[cueFile.rel]; found {
+				log.Println("-0000----")
+				log.Println(gd.name)
+				ctx.exportedGoldenFiles[gd.name] = gd
 			}
-			log.Println("cue_test golden file: ", goldenfile)
 		}
 
 		if pkg == "" {
@@ -107,7 +109,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 	// Generate empty rules
 	res.Empty = generateEmpty(args.File, ctx.isCueModDir, ctx.instances,
-		ctx.exportedInstances, ctx.exportedFiles, ctx.consolidatedInstances)
+		ctx.exportedInstances, ctx.exportedFiles, ctx.consolidatedInstances, ctx.cueTestRules, ctx.exportedGoldenFiles)
 
 	return res
 }
@@ -124,6 +126,8 @@ type ruleGenerationContext struct {
 	instances                map[string]*cueInstance
 	exportedInstances        map[string]*cueExportedInstance
 	exportedFiles            map[string]*cueExportedFiles
+	cueTestRules             map[string]*cueTest
+	exportedGoldenFiles      map[string]*GoldenFile
 	consolidatedInstances    map[string]*cueConsolidatedInstance
 	enableTnargRulesCue      bool
 	genExportedFiles         bool
@@ -349,6 +353,41 @@ func generateCueModuleRule(rel string) *rule.Rule {
 	return moduleRule
 }
 
+// genCueTestRule generates a cue_test rule for validating CUE code against golden files.
+// It creates test rules that compare the output of CUE evaluation with expected results.
+func genCueTestRule(ctx *ruleGenerationContext, tgt string, exportedFilesName string) {
+	tn := fmt.Sprintf("%s_cue_test", tgt)
+	if _, ok := ctx.cueTestRules[tn]; ok {
+		return
+	}
+	goldenFileName := ctx.config.cueTestGoldenFilename
+	if goldenFileName == "" {
+		// If no golden file name is specified, get the first available golden file
+		for _, gf := range ctx.exportedGoldenFiles {
+			goldenFileName = gf.name
+			break
+		}
+		if goldenFileName == "" {
+			return
+		}
+	}
+
+	log.Println(goldenFileName)
+
+	if !strings.HasSuffix(goldenFileName, "."+ctx.config.cueOutputFormat) {
+		// If the golden file doesn't have the correct output format extension,
+		// break and skip this file as the formats don't match
+		return
+	}
+
+	testRule := &cueTest{
+		Name:                tn,
+		GoldenFile:          ":" + goldenFileName,
+		GeneratedOutputFile: ":" + exportedFilesName + "." + ctx.config.cueOutputFormat,
+	}
+	ctx.cueTestRules[tn] = testRule
+}
+
 // Generate all rules from the context
 func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 	var rules []*rule.Rule
@@ -377,8 +416,14 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 				Imports:      instance.Imports,
 				OutputFormat: ctx.config.cueOutputFormat,
 			}
+			ctx.exportedInstances[exportedInstanceName] = exportedInstance
 			rules = append(rules, exportedInstance.ToRule())
+			// Generate test rule if golden suffix or filename is specified
+			if ctx.config.cueTestGoldenSuffix != "" || ctx.config.cueTestGoldenFilename != "" {
+				genCueTestRule(ctx, instance.Name, exportedInstanceName)
+			}
 		}
+
 	}
 
 	for _, exportedInstance := range ctx.exportedInstances {
@@ -391,6 +436,16 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 
 	for _, consolidated := range ctx.consolidatedInstances {
 		rules = append(rules, consolidated.ToRule())
+	}
+
+	for _, ts := range ctx.cueTestRules {
+		rules = append(rules, ts.ToRule())
+	}
+
+	for _, es := range ctx.exportedGoldenFiles {
+		r := rule.NewRule("cue_gen_golden", "golden_"+es.name)
+		r.SetAttr("srcs", []string{es.name})
+		rules = append(rules, r)
 	}
 
 	return rules
@@ -443,6 +498,8 @@ func generateEmpty(
 	exportedInstances map[string]*cueExportedInstance,
 	exportedFiles map[string]*cueExportedFiles,
 	consolidatedInstances map[string]*cueConsolidatedInstance,
+	cueTestRules map[string]*cueTest,
+	goldenFiles map[string]*GoldenFile,
 ) []*rule.Rule {
 	if f == nil {
 		return nil
@@ -469,25 +526,27 @@ func generateEmpty(
 		case "cue_instance":
 			_, exists := instances[name]
 			checkAndMarkEmpty(kind, name, exists)
-
 		case "cue_consolidated_instance":
 			if len(consolidatedInstances) > 0 {
 				_, exists := consolidatedInstances[name]
 				checkAndMarkEmpty(kind, name, exists)
 			}
-
 		case "cue_exported_instance", "cue_exported_standalone_files":
 			if len(exportedInstances) > 0 {
 				_, exists := exportedInstances[name]
 				checkAndMarkEmpty(kind, name, exists)
 			}
-
 		case "cue_exported_files":
 			if len(exportedFiles) > 0 {
 				_, exists := exportedFiles[name]
 				checkAndMarkEmpty(kind, name, exists)
 			}
-
+		case "cue_gen_golden":
+			_, exists := goldenFiles[name]
+			checkAndMarkEmpty(kind, name, exists)
+		case "cue_test":
+			_, exists := cueTestRules[name]
+			checkAndMarkEmpty(kind, name, exists)
 		case "cue_module":
 			if !isCueModDir {
 				checkAndMarkEmpty(kind, name, false)
@@ -707,9 +766,8 @@ type cueTest struct {
 }
 
 func (ct *cueTest) ToRule() *rule.Rule {
-	var r *rule.Rule
-	//TODO(yuan): will create rules as below
-	// 1. cue_test
-	// 2. export_files([%{GoldenFile}])
+	r := rule.NewRule("cue_test", ct.Name)
+	r.SetAttr("generated_output_file", ct.GeneratedOutputFile)
+	r.SetAttr("golden_file", ct.GoldenFile)
 	return r
 }

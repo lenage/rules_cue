@@ -150,6 +150,15 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 			},
 			ResolveAttrs: map[string]bool{"deps": true},
 		},
+		"cue_test": {
+			MatchAttrs: []string{"generated_output_file"},
+			NonEmptyAttrs: map[string]bool{
+				"golden_file": true,
+			},
+		},
+		"cue_gen_golden": {
+			MatchAttrs: []string{"srcs"},
+		},
 	}
 }
 
@@ -197,6 +206,8 @@ func (cl *cueLang) Loads() []rule.LoadInfo {
 				"cue_consolidated_standalone_files",
 				"cue_exported_files",
 				"cue_exported_standalone_files",
+				"cue_test",
+				"cue_gen_golden",
 			},
 			After: []string{
 				"cue_register_toolchains",
