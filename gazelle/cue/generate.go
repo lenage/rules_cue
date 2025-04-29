@@ -406,17 +406,19 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 		if ctx.genExportedInstances {
 			// Create a cue_exported_instance rule for each instance
 			exportedInstanceName := instance.Name + "_exported"
-			exportedInstance := &cueExportedInstance{
-				Name:         exportedInstanceName,
-				Instance:     instance.TargetName(),
-				Imports:      instance.Imports,
-				OutputFormat: ctx.config.cueOutputFormat,
-			}
-			ctx.exportedInstances[exportedInstanceName] = exportedInstance
-			rules = append(rules, exportedInstance.ToRule())
-			// Generate test rule if golden suffix or filename is specified
-			if ctx.config.cueTestGoldenSuffix != "" || ctx.config.cueTestGoldenFilename != "" {
-				genCueTestRule(ctx, instance.Name, exportedInstanceName)
+			if _, ok := ctx.exportedInstances[exportedInstanceName]; !ok {
+				exportedInstance := &cueExportedInstance{
+					Name:         exportedInstanceName,
+					Instance:     instance.TargetName(),
+					Imports:      instance.Imports,
+					OutputFormat: ctx.config.cueOutputFormat,
+				}
+				ctx.exportedInstances[exportedInstanceName] = exportedInstance
+				rules = append(rules, exportedInstance.ToRule())
+				// Generate test rule if golden suffix or filename is specified
+				if ctx.config.cueTestGoldenSuffix != "" || ctx.config.cueTestGoldenFilename != "" {
+					genCueTestRule(ctx, instance.Name, exportedInstanceName)
+				}
 			}
 		}
 
