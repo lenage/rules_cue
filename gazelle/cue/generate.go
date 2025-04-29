@@ -354,7 +354,9 @@ func generateCueModuleRule(rel string) *rule.Rule {
 // genCueTestRule generates a cue_test rule for validating CUE code against golden files.
 // It creates test rules that compare the output of CUE evaluation with expected results.
 func genCueTestRule(ctx *ruleGenerationContext, tgt string, exportedFilesName string) {
-	tn := fmt.Sprintf("%s_cue_test", tgt)
+	// NOTE(yuan): The cue_test rule will generate a target with suffix _test, so we use _cue as the target name
+	// then the final target name will be %s_cue_test
+	tn := fmt.Sprintf("%s_cue", tgt)
 	if _, ok := ctx.cueTestRules[tn]; ok {
 		return
 	}
