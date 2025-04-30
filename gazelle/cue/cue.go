@@ -87,7 +87,7 @@ func (cl *cueLang) Kinds() map[string]rule.KindInfo {
 				"ancestor":     true,
 				"srcs":         true,
 			},
-			ResolveAttrs: map[string]bool{"deps": true},
+			ResolveAttrs: map[string]bool{"deps": true, "ancestor": true},
 		},
 		// cue_exported_instance: Takes a CUE instance and exports it to a specified output format, preserving the structure defined in the instance
 		"cue_exported_instance": {
