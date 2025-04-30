@@ -38,7 +38,6 @@ var (
 func init() {
 	cueModules = make(map[string]*CueModuleInfo)
 	cueModIndex = make(map[*CueModuleInfo]map[string]string)
-	debugModIndex = false
 }
 
 // RegisterCueModule registers a cue_module for later use in resolution
@@ -61,12 +60,12 @@ func RegisterCueModule(label, dir string) {
 }
 
 // indexCueModuleDir builds an index of available targets in a cue.mod subdirectory
+// also build cuePathIndex for ancestor
 func indexCueModuleDir(moduleInfo *CueModuleInfo, subdir, dirPath string) {
 	// Initialize the index map for this module if it doesn't exist
 	if _, ok := cueModIndex[moduleInfo]; !ok {
 		cueModIndex[moduleInfo] = make(map[string]string)
 	}
-
 	err := filepath.Walk(dirPath, func(filePath string, fileInfo os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -366,6 +365,72 @@ func (cl *cueLang) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 		sort.Strings(deps)
 		r.SetAttr("deps", deps)
 	}
+
+	ResolveAncestor(c, r, ix, from)
+}
+
+// ResolveAncestor resolves the ancestor path for a cue_instance rule
+// It takes the relative path stored in the CueAncestorKey private attribute
+// and resolves it to the appropriate ancestor attribute value
+func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from label.Label) {
+	if r.Kind() != "cue_instance" {
+		return
+	}
+	// Get the import path based on the relative path
+	importPath := LabelPkgToImportPath(c, from)
+	// Look for rules that might match this import path
+	ancestorResults := ix.FindRulesByImportWithConfig(c,
+		resolve.ImportSpec{
+			Lang: cueName,
+			Imp:  importPath,
+		}, cueName)
+
+	if len(ancestorResults) > 0 {
+		res := ancestorResults[0]
+		ancestorLabel := res.Label.Rel(from.Repo, "")
+		// if not found, will use cue.mod as ancestor
+		r.SetAttr("ancestor", ancestorLabel.String())
+	}
+}
+
+func LabelPkgToImportPath(c *config.Config, label label.Label) string {
+	// LabelPkgToImportPath converts a Bazel package path to a Go import path
+	// using the Gazelle prefix and prefix relative path configuration.
+	//
+	// For example:
+	// - Gazelle Prefix: example.com
+	// - Gazelle PrefixRel: test/testdata/gazelle
+	// - Pkg: test/testdata/gazelle
+	// Result: example.com/gazelle (using base name since pkg equals prefixRel)
+	//
+	// - Gazelle Prefix: example.com
+	// - Gazelle PrefixRel: test/testdata/gazelle
+	// - Pkg: test/testdata/gazelle/subdir
+	// Result: example.com/gazelle/subdir (using relative path)
+
+	//TODO: handle cue.mod path
+	conf := GetConfig(c)
+	pkg := label.Pkg
+	prefix := conf.prefix
+	prefixRel := conf.prefixRel
+
+	if prefix == "" {
+		return pkg
+	}
+
+	if pkg == prefixRel {
+		// If pkg equals prefixRel, use the base name of the package
+		return path.Join(prefix, path.Base(pkg))
+	}
+
+	// If pkg is under prefixRel, compute the relative path and join with prefix
+	if strings.HasPrefix(pkg, prefixRel+"/") {
+		relPath := strings.TrimPrefix(pkg, prefixRel+"/")
+		return path.Join(prefix, relPath)
+	}
+
+	// If pkg is not under prefixRel, return the original pkg
+	return pkg
 }
 
 // tryResolveFromModuleIndex checks if the import exists in cue module indexes

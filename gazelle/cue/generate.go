@@ -82,7 +82,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		if pkg == "" {
 			processStandaloneFile(ctx, fname, imports)
 		} else {
-			processPackageFile(ctx, fname, pkg, imports)
+			processPackageFile(ctx, cueFile.rel, fname, pkg, imports)
 		}
 	}
 
@@ -246,7 +246,12 @@ func processStandaloneFile(ctx *ruleGenerationContext, fname string, imports []s
 }
 
 // Process a CUE file with a package
-func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, imports []string) {
+func processPackageFile(
+	ctx *ruleGenerationContext,
+	rel string, // relative path of cue file
+	fname, pkg string,
+	imports []string,
+) {
 	// For @com_github_tnarg_rules_cue - only if enabled
 	if ctx.enableTnargRulesCue {
 		processTnargLibrary(ctx, fname, pkg, imports)
@@ -258,10 +263,11 @@ func processPackageFile(ctx *ruleGenerationContext, fname string, pkg string, im
 
 	if !ok {
 		instance = &cueInstance{
-			Name:        instanceTgt,
-			PackageName: pkg,
-			Imports:     make(map[string]bool),
-			Module:      ctx.moduleLabel,
+			Name:         instanceTgt,
+			PackageName:  pkg,
+			Imports:      make(map[string]bool),
+			Module:       ctx.moduleLabel,
+			RelativePath: rel,
 		}
 		// find parent instance with prefix
 		ctx.instances[instanceTgt] = instance
@@ -600,12 +606,12 @@ func (ce *cueExport) ToRule() *rule.Rule {
 
 // New types for @rules_cue rules
 type cueInstance struct {
-	Name        string
-	PackageName string
-	Srcs        []string
-	Imports     map[string]bool
-	Ancestor    string
-	Module      string // Reference to the nearest cue_module
+	Name         string
+	PackageName  string
+	Srcs         []string
+	Imports      map[string]bool
+	RelativePath string
+	Module       string // Reference to the nearest cue_module
 }
 
 func (ci *cueInstance) ToRule() *rule.Rule {
@@ -615,10 +621,8 @@ func (ci *cueInstance) ToRule() *rule.Rule {
 	rule.SetAttr("package_name", ci.PackageName)
 	rule.SetAttr("visibility", []string{"//visibility:public"})
 
-	switch {
-	case ci.Ancestor != "":
-		rule.SetAttr("ancestor", ci.Ancestor)
-	case ci.Module != "":
+	// set ancestor to module and update later after resolve
+	if ci.Module != "" {
 		rule.SetAttr("ancestor", ci.Module)
 	}
 
