@@ -414,8 +414,9 @@ func LabelPkgToImportPath(c *config.Config, label label.Label) string {
 	prefix := conf.prefix
 	prefixRel := conf.prefixRel
 
-	if prefix == "" {
-		return pkg
+	// NOTE(yuan): use cue.mod as ancestor for cue.mod
+	if strings.Contains(pkg, "cue.mod") {
+		return ""
 	}
 
 	if pkg == prefixRel {
@@ -426,11 +427,12 @@ func LabelPkgToImportPath(c *config.Config, label label.Label) string {
 	// If pkg is under prefixRel, compute the relative path and join with prefix
 	if strings.HasPrefix(pkg, prefixRel+"/") {
 		relPath := strings.TrimPrefix(pkg, prefixRel+"/")
-		return path.Join(prefix, relPath)
+		return path.Join(prefix, path.Dir(relPath))
 	}
 
-	// If pkg is not under prefixRel, return the original pkg
-	return pkg
+	// Get the parent directory of the package path
+	// If the package path contains "cue.mod", split it and use the second part
+	return path.Dir(pkg)
 }
 
 // tryResolveFromModuleIndex checks if the import exists in cue module indexes

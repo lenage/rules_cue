@@ -1,6 +1,6 @@
 #gazelle:cue_gen_exported_instance
 
-load("@rules_cue//cue:cue.bzl", "cue_exported_files")
+load("@rules_cue//cue:cue.bzl", "cue_exported_files", "cue_gen_golden")
 
 cue_exported_files(
     name = "dev_cue_exported_files",
@@ -18,4 +18,9 @@ cue_exported_files(
     output_format = "json",
     visibility = ["//visibility:public"],
     deps = ["//test/testdata/gazelle:gazelle_cue_instance"],
+)
+
+cue_gen_golden(
+    name = "golden_prod_cue_exported_files-golden.json",
+    srcs = ["prod_cue_exported_files-golden.json"],
 )

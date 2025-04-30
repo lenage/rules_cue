@@ -1,4 +1,4 @@
-load("@rules_cue//cue:cue.bzl", "cue_consolidated_instance", "cue_instance")
+load("@rules_cue//cue:cue.bzl", "cue_consolidated_instance", "cue_exported_instance", "cue_instance")
 
 cue_instance(
     name = "time_cue_instance",
@@ -18,5 +18,12 @@ cue_consolidated_instance(
     name = "time_cue_def",
     instance = ":time_cue_instance",
     output_format = "cue",
+    visibility = ["//visibility:public"],
+)
+
+cue_exported_instance(
+    name = "time_cue_instance_exported",
+    instance = ":time_cue_instance",
+    output_format = "json",
     visibility = ["//visibility:public"],
 )
