@@ -385,11 +385,13 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 			Imp:  importPath,
 		}, cueName)
 
-	if len(ancestorResults) > 0 {
-		res := ancestorResults[0]
-		ancestorLabel := res.Label.Rel(from.Repo, "")
-		// if not found, will use cue.mod as ancestor
-		r.SetAttr("ancestor", ancestorLabel.String())
+	// Find a rule with the same name as the current rule's package
+	for _, res := range ancestorResults {
+		if res.Label.Name == from.Name {
+			ancestorLabel := res.Label.Rel(from.Repo, "")
+			r.SetAttr("ancestor", ancestorLabel.String())
+			break
+		}
 	}
 }
 

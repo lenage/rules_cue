@@ -62,7 +62,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		exportedFiles:            make(map[string]*cueExportedFiles),
 		exportedInstances:        make(map[string]*cueExportedInstance),
 		consolidatedInstances:    make(map[string]*cueConsolidatedInstance),
-		exportedGoldenFiles:      make(map[string]*GoldenFile),
+		exportedGoldenFiles:      make(map[string]*GoldenFile), // key: filename
 		cueTestRules:             make(map[string]*cueTest),
 		genConsolidatedInstances: true,
 		genExportedInstances:     conf.cueGenExportedInstance,
@@ -75,6 +75,7 @@ func (cl *cueLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 
 		if conf.cueTestGoldenSuffix != "" {
 			if gd, found := cueTestGoldenfiles[cueFile.rel]; found {
+				// log.Printf("Found golden file %s for CUE file %s", gd.name, cueFile.rel)
 				ctx.exportedGoldenFiles[gd.name] = gd
 			}
 		}
@@ -285,7 +286,7 @@ func processPackageFile(
 		if !ok {
 			exportedFile = &cueExportedFiles{
 				Name:         exportedFilesName,
-				Module:       ctx.moduleLabel, //TODO(yuan): should be package or module label?
+				Module:       ctx.moduleLabel,
 				Imports:      make(map[string]bool),
 				OutputFormat: ctx.config.cueOutputFormat,
 			}
@@ -412,6 +413,9 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 		rules = append(rules, instance.ToRule())
 
 		if ctx.genExportedInstances {
+			if len(ctx.exportedGoldenFiles) == 0 {
+				continue
+			}
 			// Create a cue_exported_instance rule for each instance
 			exportedInstanceName := instance.Name + "_exported"
 			if _, ok := ctx.exportedInstances[exportedInstanceName]; !ok {
@@ -423,12 +427,13 @@ func generateRules(ctx *ruleGenerationContext) []*rule.Rule {
 				}
 				ctx.exportedInstances[exportedInstanceName] = exportedInstance
 				// Generate test rule if golden suffix or filename is specified
+				// Log the exported golden files for debugging
+				// Generate test rule if we have golden files and golden suffix or filename is configured
 				if ctx.config.cueTestGoldenSuffix != "" || ctx.config.cueTestGoldenFilename != "" {
 					genCueTestRule(ctx, instance.Name, exportedInstanceName)
 				}
 			}
 		}
-
 	}
 
 	for _, exportedInstance := range ctx.exportedInstances {
