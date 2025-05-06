@@ -22,16 +22,19 @@ type cueConfig struct {
 
 	// cueTestGoldenSuffix is the suffix used for golden test files in CUE tests.
 	// This allows customizing the suffix for generated test files.
-	// seit with #gazelle:cue_test_golden_suffix
+	// set with #gazelle:cue_test_golden_suffix <FILE_SUFFIX>
+	// example: #gazelle:cue_test_golden_suffix -gen.yml
 	cueTestGoldenSuffix string
 
 	// cueTestGoldenFilename is the filename used for golden test files in CUE tests.
 	// This allows specifying a custom filename for the golden test file.
-	// set with #gazelle:cue_test_golden_filename
+	// set with #gazelle:cue_test_golden_filename <FILENAME>
+	// example: #gazelle:cue_test_golden_filename main.gen.json
 	cueTestGoldenFilename string
 
 	// cueGenExportedInstance controls whether to generate cue_exported_instance rules
 	// for each cue_instance. When true, a corresponding cue_exported_instance rule will be created.
+	// #gazelle:cue_exported_instance
 	cueGenExportedInstance bool
 
 	// cueOutputFormat specifies the output format for CUE exports.
