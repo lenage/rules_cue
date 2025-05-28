@@ -376,21 +376,47 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 	if r.Kind() != "cue_instance" {
 		return
 	}
-	// Get the import path based on the relative path
-	importPath := LabelPkgToImportPath(c, from)
-	// Look for rules that might match this import path
-	ancestorResults := ix.FindRulesByImportWithConfig(c,
-		resolve.ImportSpec{
-			Lang: cueName,
-			Imp:  importPath,
-		}, cueName)
 
-	// Find a rule with the same name as the current rule's package
-	for _, res := range ancestorResults {
-		if res.Label.Name == from.Name {
-			ancestorLabel := res.Label.Rel(from.Repo, "")
-			r.SetAttr("ancestor", ancestorLabel.String())
+	// Start with the current label and walk up the directory tree
+	currentLabel := from
+
+	for {
+		// Get the import path based on the current path
+		importPath := LabelPkgToImportPath(c, currentLabel)
+
+		// If we've reached cue.mod level (empty import path), stop
+		if importPath == "" {
 			break
+		}
+
+		// Look for rules that might match this import path
+		ancestorResults := ix.FindRulesByImportWithConfig(c,
+			resolve.ImportSpec{
+				Lang: cueName,
+				Imp:  importPath,
+			}, cueName)
+
+		// Find a rule with the same name as the current package
+		for _, res := range ancestorResults {
+			if res.Label.Name == currentLabel.Name {
+				ancestorLabel := res.Label.Rel(from.Repo, "")
+				r.SetAttr("ancestor", ancestorLabel.String())
+				return
+			}
+		}
+
+		// Move up one directory level
+		parentPkg := path.Dir(currentLabel.Pkg)
+		if parentPkg == currentLabel.Pkg {
+			// We've reached the root, stop
+			break
+		}
+
+		// Create a new label for the parent directory with the same name
+		currentLabel = label.Label{
+			Repo: currentLabel.Repo,
+			Pkg:  parentPkg,
+			Name: path.Base(parentPkg),
 		}
 	}
 }
@@ -410,7 +436,6 @@ func LabelPkgToImportPath(c *config.Config, label label.Label) string {
 	// - Pkg: test/testdata/gazelle/subdir
 	// Result: example.com/gazelle/subdir (using relative path)
 
-	//TODO: handle cue.mod path
 	conf := GetConfig(c)
 	pkg := label.Pkg
 	prefix := conf.prefix
