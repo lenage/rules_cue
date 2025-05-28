@@ -389,6 +389,8 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 			break
 		}
 
+		log.Printf("ResolveAncestor: importPath: %s, from label: %s", importPath, currentLabel.String())
+
 		// Look for rules that might match this import path
 		ancestorResults := ix.FindRulesByImportWithConfig(c,
 			resolve.ImportSpec{
@@ -400,6 +402,7 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 		for _, res := range ancestorResults {
 			if res.Label.Name == currentLabel.Name {
 				ancestorLabel := res.Label.Rel(from.Repo, "")
+				log.Printf("ancestor: %s", ancestorLabel.String())
 				r.SetAttr("ancestor", ancestorLabel.String())
 				return
 			}
@@ -409,6 +412,7 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 		parentPkg := path.Dir(currentLabel.Pkg)
 		if parentPkg == currentLabel.Pkg {
 			// We've reached the root, stop
+			log.Printf("ResolveAncestor: Reached root, stopping at %s", currentLabel.Pkg)
 			break
 		}
 
@@ -418,6 +422,7 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 			Pkg:  parentPkg,
 			Name: path.Base(parentPkg),
 		}
+		log.Printf("ResolveAncestor: Moving up to parent directory: %s", currentLabel.String())
 	}
 }
 
