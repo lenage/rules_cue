@@ -421,7 +421,7 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 		currentLabel = label.Label{
 			Repo: currentLabel.Repo,
 			Pkg:  parentPkg,
-			Name: path.Base(parentPkg),
+			Name: from.Name, // keep name same as from when lookup
 		}
 		log.Printf("ResolveAncestor: Moving up to parent directory: %s", currentLabel.String())
 	}
