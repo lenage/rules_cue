@@ -379,6 +379,7 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 
 	// Start with the current label and walk up the directory tree
 	currentLabel := from
+	log.Printf("-----------------ResolveAncestor: %s -------------------", from.String())
 
 	for {
 		// Get the import path based on the current path
