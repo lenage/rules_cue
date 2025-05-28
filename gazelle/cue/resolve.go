@@ -399,7 +399,6 @@ func ResolveAncestor(c *config.Config, r *rule.Rule, ix *resolve.RuleIndex, from
 		for _, res := range ancestorResults {
 			if res.Label.Name == currentLabel.Name {
 				ancestorLabel := res.Label.Rel(from.Repo, "")
-				log.Printf("ancestor: %s", ancestorLabel.String())
 				r.SetAttr("ancestor", ancestorLabel.String())
 				return
 			}
